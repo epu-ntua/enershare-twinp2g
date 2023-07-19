@@ -1,0 +1,4 @@
+name,carrier,control,generator
+Diesel,AC,Slack,Diesel Gen
+Solar,AC,PV,PV Park
+Hydrogen,hydrogen,PQ,
