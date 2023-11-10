@@ -1,0 +1,7 @@
+Component,Carrier,Bus,From Bus,To Bus,Pnom,Capital Cost,Marginal Cost,input_series_source_type,input_series_source_uri,use_case_name,Investment Period
+Generator,Solar,Bus 0,,,5.0,0.0,50.0,csv file,,,
+Line,AC,,Bus 0,Bus 0,,,,,,,
+Load,AC,Bus 0,,,,,,csv file,load_data1.csv,,5.0
+Link,Electrolysis,,Bus 0,Hydrogen Bus,2.5,1000000.0,110.0,,,,
+Link,Fuel Cell,,Hydrogen Bus,Bus 0,1.2,1000000.0,110.0,,,,
+Store,Hydrogen Store,Hydrogen Bus,,,15.0,40000.0,10.0,,,,
