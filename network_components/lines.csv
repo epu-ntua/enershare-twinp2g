@@ -1,2 +1,0 @@
-name,bus0,bus1,x,r,s_nom_extendable,build_year,carrier,x_pu_eff,r_pu_eff,s_nom_opt,v_nom
-Line,Diesel,Solar,0.1,0.01,True,0,AC,0.1,0.01,4.692,1.0

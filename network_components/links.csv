@@ -1,3 +1,0 @@
-name,bus0,bus1,carrier,efficiency,build_year,p_nom,p_nom_extendable,capital_cost,marginal_cost,min_up_time,min_down_time,up_time_before,down_time_before,p_nom_opt
-Electrolysis,Solar,Hydrogen,electrolysis,0.7,0,2.5,True,70000.0,30.0,0,0,1,0,2.53317
-Fuel Cell,Hydrogen,Solar,fuel cell,0.6,0,1.2,True,70000.0,30.0,0,0,1,0,1.145
