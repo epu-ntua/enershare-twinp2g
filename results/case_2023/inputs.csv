@@ -1,8 +1,0 @@
-carriers,Pnom,Capital Cost,Marginal Cost,Network Buses,Investment Period,Data
-Diesel_Gen,5.0,0,305,2,5,pvlib
-PV_Park,1.0,0,24,0,0,0
-Line,0.0,0,0,0,0,0
-electrolysis,2.5,1000000,110,0,0,0
-fuel cell,1.2,1000000,110,0,0,0
-Load,0.0,0,0,0,0,0
-hydrogen,15.0,40000,10,0,0,0
