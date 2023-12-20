@@ -1,230 +1,421 @@
 {
-  "title": "P2G inputs",
-  "description": "This document records the inputs of the P2G system",
-  "type": "object",
-  "properties": {
-    "Component": {
-      "description": "Components of the system",
-      "type": "object",
-      "allowed_values": {
-        "Generator": {
-          "description": "The generator of each bus",
-          "type": "string",
-          "grid component": "Generator"
-        },
-        "Line": {
-          "description": "The line connecting two buses, bus0 and bus1",
-          "type": "string",
-          "grid component": "Line"
-        },
-        "Load": {
-          "description": "The load of a bus",
-          "type": "string",
-          "grid component": "Load"
-        },
-        "Link": {
-          "description": "The link is a component for controllable directed flows between two buses, bus0 and bus1 with arbitrary energy carriers. The Link component can be used for any element with a controllable power flow: Energy conversion from AC to hydrogen network via electrolysis and vice versa via fuel cells",
-          "type": "string",
-          "grid component": null
-        },
-        "Store": {
-          "description": "The store of hydrogen",
-          "type": "string",
-          "grid component": "Storage"
-        }
-      }
-    },
-    "Carrier": {
-      "description": "Energy carrier for each Component.",
-      "type": "object",
-      "properties": {
-        "Generator": {
-          "allowed_values":{
-            "Diesel": {
-              "description": "Fuel for electricity generation",
-              "type": "string",
-              "grid component": "Diesel Generator"
-            },
-            "Coal": {
-              "description": "Fuel for electricity generation",
-              "type": "string",
-              "grid component": "Coal Generator"
-            },
-            "Natural Gas": {
-              "description": "Fuel for electricity generation",
-              "type": "string",
-              "grid component": "Natural Gas Generator"
-            },
-            "Hydro": {
-              "description": "Hydro power plant for electricity generation",
-              "type": "string",
-              "grid component": "Hydro power plant"
-            },
-            "Solar": {
-              "description": "Photovoltaic park for electricity generation",
-              "type": "string",
-              "grid component": "PV Panel"
-            },
-            "Wind": {
-              "description": "Wind farm for electricity generation",
-              "type": "string",
-              "grid component": "Wind Turbine"
-            }
-          }
-        },
-        "Line": {
-          "allowed_values":{
-            "AC": {
-              "description": "The Line energy type",
-              "type": "string",
-              "grid component": "AC Line"
-            }
-          }
-        },
-        "Load": {
-          "allowed_values":{
-            "AC": {
-              "description": "The Load energy type",
-              "type": "string",
-              "grid component": "AC Load"
-            }
-          }
-        },
-        "Link": {
-          "allowed_values":{
-            "Electrolysis": {
-              "description": "Electrical energy into chemical energy. It consists of: Electrolyser, O2 tank, H2O tank, Compressors, Hydrogen Distribution and Utilization Infrastructure, Control and Monitoring System",
-              "type": "string",
-              "grid component": "Electrolysis equipment"
-            },
-            "Fuel Cell": {
-              "description": "Chemical energy into electrical energy. It consists of: Fuel Cell, H2O tank, Control and Monitoring System",
-              "type": "string",
-              "grid component": "Fuel Cell equipment"
-            }
-          }
-        },
-        "Store": {
-          "allowed_values":{
-            "Hydrogen Store": {
-              "description": "Hydrogen store",
-              "type": "string",
-              "grid component": "Hydrogen Store"
-            }
-          }
-        }
-      }
-    },
-    "Bus": {
-      "description": "The bus connected to Components such as Generator, Load, Store",
-      "type": "string",
-      "properties": ["Generator","Load","Store"]
-    },
-    "From Bus": {
-      "description": "The first bus (bus0) linked to Components such as Lines and Links",
-      "type": "string",
-      "properties": ["Line","Link"]
-    },
-    "To Bus": {
-      "description": "The second bus (bus1) linked to Components such as Lines and Links",
-      "type": "string",
-      "properties": ["Line","Link"]
-    },
-    "Pnom": {
-      "description": "Nominal Power of Components",
-      "type": "number",
-      "unit": "MW",
-      "minimum": 0
-    },
-    "Capital Cost": {
-      "description": "Capital cost of extending Components Pnom by 1 MW",
-      "type": "number",
-      "unit": "€/MW",
-      "minimum": 0
-    },
-    "Marginal Cost": {
-      "description": "Marginal cost of Components",
-      "type": "number",
-      "unit": "€/MWh",
-      "minimum": 0
-    },
-    "input_series_source_type": {
-      "description": "Data format for RES generation",
-      "type": "object",
-      "properties": {
-        "Generator": {
-          "Solar": {
-            "allowed_values":{
-              "pvlib": {
-                "description": "A python library that generates PV production data",
-                "type": "string"
-              },
-              "csv file": {
-                "description": "Csv file given by the user",
-                "type": "string"
-              },
-              "TimescaleDB": {
-                "description": "TimescaleDB",
-                "type": "string"
-              }
-            }
-          },
-          "Wind":{
-            "allowed_values":{
-              "csv file": {
-                "description": "Csv file given by the user",
-                "type": "string"
-              },
-              "TimescaleDB": {
-                "description": "TimescaleDB",
-                "type": "string"
-              }
-            }
-          }
-        },
-        "Load":{
-          "allowed_values":{
-            "csv file": {
-              "description": "Csv file given by the user",
-              "type": "string"
-            },
-            "TimescaleDB": {
-              "description": "TimescaleDB",
-              "type": "string"
-            }
-          }
-        }
-      }
-    },
-    "input_series_source_uri": {
-      "description": "File path for RES production and load consumption",
-      "type": "object",
-      "properties": {
-        "Generator": {
-          "Solar": {
-            "description": "File for pv production",
+    "title": "P2G inputs",
+    "description": "This document records the inputs of the P2G system",
+    "type": "object",
+    "properties": {
+        "use_case_name": {
+            "description": "A unique identifier for each test given by the user",
             "type": "string"
-          },
-          "Wind": {
-            "description": "File for wind production",
-            "type": "string"
-          }
         },
-        "Load": {
-          "description": "File for load consumption",
-          "type": "string"
+        "Component": {
+            "description": "Components of the system",
+            "type": "object",
+            "allowed_values": {
+                "Bus":{
+                    "description":"The bus is the fundamental node of the network, to which components like loads, generators and transmission lines attach.",
+                    "type":"object",
+                    "grid component":"Bus",
+                    "carrier":{
+                        "description": "Energy carrier: can be “AC” or “DC” for electrical buses, or “heat” or “gas",
+                        "type":"object",
+                        "allowed_values":{
+                            "AC": {
+                                "description": "Bus energy type",
+                                "type": "string"
+                            },
+                            "DC": {
+                                "description": "Bus energy type",
+                                "type": "string"
+                            },
+                            "hydrogen":{
+                                "description": "Bus energy type",
+                                "type": "string"  
+                            },
+                            "gas": {
+                                "description": "Bus energy type",
+                                "type": "string"                            
+                            },
+                            "heat": {
+                                "description": "Bus energy type",
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "Generator": {
+                    "description": "The generator of each bus",
+                    "type": "object",
+                    "grid component": "Generator",
+                    "carrier":{
+                        "description": "Energy carrier of each Generator.",
+                        "type": "object",
+                        "allowed_values":{
+                            "Diesel": {
+                                "description": "Fuel for electricity generation",
+                                "type": "string",
+                                "grid component": "Diesel Generator"
+                            },
+                            "Coal": {
+                                "description": "Fuel for electricity generation",
+                                "type": "string",
+                                "grid component": "Coal Generator"
+                            },
+                            "Natural Gas": {
+                                "description": "Fuel for electricity generation",
+                                "type": "string",
+                                "grid component": "Natural Gas Generator"
+                            },
+                            "Hydro": {
+                                "description": "Hydro power plant for electricity generation",
+                                "type": "string",
+                                "grid component": "Hydro power plant"
+                            },
+                            "Solar": {
+                                "description": "Photovoltaic park for electricity generation",
+                                "type": "string",
+                                "grid component": "PV Panel",
+                                "input_series_source_type": {
+                                    "description": "Data format for RES generation",
+                                    "type": "object",
+                                    "allowed_values":{
+                                        "pvlib": {
+                                            "description": "A python library that generates PV production data",
+                                            "type": "string"
+                                        },
+                                        "csv file": {
+                                            "description": "Csv file given by the user",
+                                            "type": "string"
+                                        },
+                                        "TimescaleDB": {
+                                            "description": "TimescaleDB",
+                                            "type": "string"
+                                        }
+                                    }
+                                },
+                                "input_series_source_uri": {
+                                    "description": "File path for pv production",
+                                    "type": "string"
+                                }
+                            },
+                            "Wind": {
+                                "description": "Wind farm for electricity generation",
+                                "type": "object",
+                                "grid component": "Wind Turbine",
+                                "input_series_source_type": {
+                                    "description": "Data format for RES generation",
+                                    "type": "object",
+                                    "allowed_values":{
+                                        "csv file": {
+                                            "description": "Csv file given by the user",
+                                            "type": "string"
+                                        },
+                                        "TimescaleDB": {
+                                            "description": "TimescaleDB",
+                                            "type": "string"
+                                        }
+                                    }
+                                },
+                                "input_series_source_uri": {
+                                    "description": "File path for wind production",
+                                    "type": "string"
+                                }   
+                            }
+                        }
+                    },
+                    "bus": {
+                        "description": "The bus connected to Generator",
+                        "type": "string"
+                    },
+                    "p_nom": {
+                        "description": "Nominal Power of Generator",
+                        "type": "number",
+                        "unit": "MW",
+                        "minimum": 0
+                    },
+                    "capital_cost": {
+                        "description": "Capital cost of extending Generator p_nom by 1 MW",
+                        "type": "number",
+                        "unit": "€/MW",
+                        "minimum": 0
+                    },
+                    "marginal_cost": {
+                        "description": "Marginal cost of Generator",
+                        "type": "number",
+                        "unit": "€/MWh",
+                        "minimum": 0
+                    },
+                    "investment_period": {
+                        "description": "The period the simulator runs",
+                        "type": "number",
+                        "unit": "years",
+                        "minimum": 0
+                    }   
+                },
+                "Line": {
+                    "description": "The line connecting two buses, bus0 and bus1",
+                    "type": "object",
+                    "grid component": "Line",
+                    "carrier":{
+                        "description": "Energy carrier for each Line.",
+                        "type": "object",
+                        "allowed_values":{
+                            "AC": {
+                                "description": "The Line energy type",
+                                "type": "string",
+                                "grid component": "AC Line"
+                            },
+                            "DC": {
+                                "description": "The Line energy type",
+                                "type": "string",
+                                "grid component": "DC Line"
+                            }                    
+                        }
+                    },
+                    "from_bus": {
+                        "description": "The first bus (bus0) linked to Line",
+                        "type": "string"
+                    },
+                    "to_bus": {
+                        "description": "The second bus (bus1) linked to Line",
+                        "type": "string"
+                    },
+                    "capital_cost": {
+                        "description": "Capital cost of extending Line p_nom by 1 MW",
+                        "type": "number",
+                        "unit": "€/MW",
+                        "minimum": 0
+                    }
+                },
+                "Load": {
+                    "description": "The load of a bus",
+                    "type": "object",
+                    "grid component": "Load",
+                    "carrier":{
+                        "description": "Energy carrier for each Load.",
+                        "type": "object",
+                        "allowed_values":{
+                            "AC": {
+                                "description": "Load energy type",
+                                "type": "string",
+                                "grid component": "AC Load"
+                            },
+                            "DC": {
+                                "description": "Load energy type",
+                                "type": "string",
+                                "grid component": "DC Load"
+                            },
+                            "gas": {
+                                "description": "Load energy type",
+                                "type": "string",
+                                "grid component": "Gas Load"
+                            },
+                            "heat": {
+                                "description": "Load energy type",
+                                "type": "string",
+                                "grid component": "Heat Load"
+                            }                    
+                        }
+                    },
+                    "bus": {
+                        "description": "The bus connected to Load",
+                        "type": "string"
+                    },
+                    "input_series_source_type": {
+                        "description": "Data format for load consumption",
+                        "type": "object",
+                        "allowed_values":{
+                            "csv file": {
+                            "description": "Csv file given by the user",
+                            "type": "string"
+                            },
+                            "TimescaleDB": {
+                            "description": "TimescaleDB",
+                            "type": "string"
+                            }
+                        }
+                    },
+                    "input_series_source_uri": {
+                        "description": "File path for load consumption",
+                        "type": "string"
+                    }
+                },
+                "Link": {
+                    "description": "The link is a component for controllable directed flows between two buses, bus0 and bus1 with arbitrary energy carriers. The Link component can be used for any element with a controllable power flow: Energy conversion from AC to hydrogen network via electrolysis and vice versa via fuel cells",
+                    "type": "object",
+                    "grid component": null,
+                    "carrier":{
+                        "description": "Energy carrier for each Link.",
+                        "type": "object",
+                        "allowed_values":{
+                            "Electrolysis": {
+                                "description": "Electrical energy into chemical energy. It consists of: Electrolyser, O2 tank, H2O tank, Compressors, Hydrogen Distribution and Utilization Infrastructure, Control and Monitoring System",
+                                "type": "string",
+                                "grid component": "Electrolysis equipment"
+                            },
+                            "Fuel Cell": {
+                                "description": "Chemical energy into electrical energy. It consists of: Fuel Cell, H2O tank, Control and Monitoring System",
+                                "type": "string",
+                                "grid component": "Fuel Cell equipment"
+                            },
+                            "Methanation": {
+                                "description": "Chemical energy into chemical energy. It consists of: Methanation Plant",
+                                "type": "string",
+                                "grid component": "Methanation equipment"
+                            }                   
+                        }
+                    },
+                    "from_bus": {
+                        "description": "The first bus (bus0) linked to Link",
+                        "type": "string" 
+                    },
+                    "to_bus": {
+                        "description": "The second bus (bus1) linked to Link",
+                        "type": "string"
+                    },
+                    "efficiency":{
+                        "description": "Efficiency of Link",
+                        "type": "number",
+                        "unit": null,
+                        "minimum": 0,
+                        "maximum": 1
+                    },
+                    "p_nom": {
+                        "description": "Nominal Power of Link",
+                        "type": "number",
+                        "unit": "MW",
+                        "minimum": 0
+                    },
+                    "capital_cost": {
+                        "description": "Capital cost of extending Link p_nom by 1 MW",
+                        "type": "number",
+                        "unit": "€/MW",
+                        "minimum": 0
+                    },
+                    "marginal_cost": {
+                        "description": "Marginal cost of Link",
+                        "type": "number",
+                        "unit": "€/MWh",
+                        "minimum": 0
+                    },
+                    "investment_period": {
+                        "description": "The period the simulator runs",
+                        "type": "number",
+                        "unit": "years",
+                        "minimum": 0
+                    }               
+                },
+                "Store": {
+                    "description": "Energy Storage (e.g. hydrogen tank, battery, synthetic natural gas tank, natural gas tank)",
+                    "type": "object",
+                    "grid component": "Storage",
+                    "carrier":{
+                        "description": "Energy carrier for each Component.",
+                        "type": "object",
+                        "allowed_values":{
+                            "Hydrogen Store": {
+                                "description": "Hydrogen Storage",
+                                "type": "string",
+                                "grid component": "Hydrogen Tank"
+                            },
+                            "Battery": {
+                                "description": "Battery",
+                                "type": "string",
+                                "grid component": "Battery"
+                            },
+                            "Synthetic Natural Gas Store": {
+                                "description": "Synthetic Natural Gas Tank Storage",
+                                "type": "string",
+                                "grid component": "Synthetic Natural Gas Tank"
+                            },
+                            "Natural Gas Tank": {
+                                "description": "Natural Gas Tank Storage",
+                                "type": "string",
+                                "grid component": "Natural Gas Tank"
+                            }
+                        }
+                    },
+                    "bus": {
+                        "description": "The bus connected to Store",
+                        "type": "string"
+                    },
+                    "p_nom": {
+                        "description": "Nominal Energy of Store",
+                        "type": "number",
+                        "unit": "MW",
+                        "minimum": 0
+                    },
+                    "capital_cost": {
+                        "description": "Capital cost of extending Store p_nom by 1 MWh",
+                        "type": "number",
+                        "unit": "€/MW",
+                        "minimum": 0
+                    },
+                    "marginal_cost": {
+                        "description": "Marginal cost of Store",
+                        "type": "number",
+                        "unit": "€/MWh",
+                        "minimum": 0
+                    },
+                    "investment_period": {
+                        "description": "The period the simulator runs",
+                        "type": "number",
+                        "unit": "years",
+                        "minimum": 0
+                    }                     
+                },
+                "Transformer":{
+                    "description": "Transformers represent 2-winding transformers that convert AC power from one voltage level to another.",
+                    "type": "object",
+                    "grid component": "Transformer",
+                    "from_bus": {
+                        "description": "The first bus (bus0) linked to Transformer",
+                        "type": "string" 
+                    },
+                    "to_bus": {
+                        "description": "The second bus (bus1) linked to Transformer",
+                        "type": "string"
+                    },
+                    "capital_cost": {
+                        "description": "Capital cost of extending Store p_nom by 1 MWh",
+                        "type": "number",
+                        "unit": "€/MW",
+                        "minimum": 0
+                    },
+                    "s_nom":{
+                        "description": "Limit of apparent power which can pass through branch.",
+                        "type":"number",
+                        "unit": "MVA",
+                        "minimum": 0
+                    }
+                },
+                "Global Constraints":{
+                    "description": "Global constraints are added to OPF problems and apply to many components at once.",
+                    "type": "object",
+                    "grid component": null,
+                    "investment_period":{
+                        "description": "Time period when the constraint is applied",
+                        "type":"number",
+                        "minimum": 0
+                    },
+                    "carrier_attribute":{
+                        "description": "If the global constraint is connected with an energy carrier, name the associated carrier attribute",
+                        "type":"string"
+                    },
+                    "sense":{
+                        "description": "Constraint sense, must be one of <=, == or >=",
+                        "type":"string"
+                    },
+                    "constant":{
+                        "description": "Constant for right-hand-side of constraint for optimisation period. For a CO2 constraint, this would be tonnes of CO2-equivalent emissions.",
+                        "type":"number"
+                    }
+                },
+                "Shapes":{
+                    "description": "Shapes is of a geopandas dataframe which can be used to store network-related geographical data (for plotting, calculating potentials, etc.)",
+                    "type":"object",
+                    "grid component": null                    
+                }
+            }
         }
-      }
-    },
-    "use_case_name": {
-      "description": "A unique identifier for each test given by the user",
-      "type": "string"
-    },
-    "Investment Period": {
-      "description": "The period the simulator runs",
-      "type": "number",
-      "unit": "years",
-      "minimum": 0
     }
-  }
 }

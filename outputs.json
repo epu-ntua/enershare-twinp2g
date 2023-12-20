@@ -1,0 +1,143 @@
+{
+    "title": "P2G outputs",
+    "description": "This document records the outputs of the P2G system",
+    "type": "object",
+    "properties": {
+        "use_case_name": {
+            "description": "A unique identifier for each test given by the user",
+            "type": "string",
+            "output_properties":{
+                "output_series.csv":{
+                    "description":"Output series csv columns: Datetime, Generators, Links, Loads, Stores",
+                    "type":"array",
+                    "properties":{
+                        "Datetime":{
+                            "description": "Datetime of each snapshot",
+                            "type":"string",
+                            "format":"%Y-%m-%d %H:%M:%S+00:00"
+                        },
+                        "^Generator Bus [0-9]$":{
+                            "description": "Generator output in selected Bus",
+                            "type":"number",
+                            "unit":"MW",
+                            "minimum": 0               
+                        },
+                        "^Electrolysis Bus [0-9] - Bus [0-9]$":{
+                            "description": "Electrolysis output in selected Bus",
+                            "type":"number",
+                            "unit":"MW",
+                            "minimum": 0   
+                        },
+                        "^Fuel Cell Bus [0-9] - Bus [0-9]$":{
+                            "description": "Fuel Cell output in selected Bus",
+                            "type":"number",
+                            "unit":"MW",
+                            "minimum": 0   
+                        },
+                        "^Methanation Bus [0-9] - Bus [0-9]$":{
+                            "description": "Methanation output in selected Bus",
+                            "type":"number",
+                            "unit":"MW",
+                            "minimum": 0   
+                        },
+                        "^Store Bus [0-9]$":{
+                            "description": "Store output in selected Bus",
+                            "type":"number",
+                            "unit":"MWh",
+                            "minimum": 0                                 
+                        },
+                        "^Load Bus [0-9]$":{
+                            "description": "Load output in selected Bus",
+                            "type":"number",
+                            "unit":"MW",
+                            "minimum": 0                                
+                        }
+                    }
+                },
+                "statistics.csv":{
+                    "description":"Information about different network metrics",
+                    "type":"array",
+                    "properties":{
+                        "Capacity Factor": {
+                            "description": "Calculate the capacity factor of components in the network",
+                            "type": "number",
+                            "unit": null,
+                            "minimum": 0,
+                            "maximum": 1        
+                        },
+                        "Capital Expenditure": {
+                            "description": "Calculate the capital expenditure of components in the network",
+                            "type": "number",
+                            "unit": "€",
+                            "minimum": 0,         
+                            "maximum": null
+                        },
+                        "Curtailment": {
+                            "description": "Calculate the reduction of energy production of components due to various factors, such as grid limitations.",
+                            "type": "number",
+                            "unit": "MWh",  
+                            "minimum": 0,
+                            "maximum":null      
+                        },
+                        "Dispatch": {
+                            "description": "Calculate which power plants should generate electricity at a given time.",
+                            "type": "number",
+                            "unit": "MWh",
+                            "minimum": null,
+                            "maximum":null
+                        },
+                        "Installed Capacity": {
+                            "description": "Calculate the total potential power output of components.",
+                            "type": "number",
+                            "unit": "MW",
+                            "minimum": 0,
+                            "maximum":null      
+                        },
+                        "Market Value": {
+                            "description": "Calculate the monetary value of energy in the market.",
+                            "type": "number",
+                            "unit": "€/MWh",
+                            "minimum": null,
+                            "maximum":null
+                        },
+                        "Operational Expenditure": {
+                            "description": "Calculate the operational expenditure in the network ",
+                            "type": "number",
+                            "unit": "€",
+                            "minimum": 0,
+                            "maximum":null
+                        },
+                        "Optimal Capacity": {
+                            "description": "Calculate the optimal capacity of the network components",
+                            "type": "number",
+                            "unit": "MW",
+                            "minimum": 0,
+                            "maximum":null
+                        },
+                        "Revenue": {
+                            "description": "Calculate the revenue of components in the network",
+                            "type": "number",
+                            "unit": "€",
+                            "minimum": 0,
+                            "maximum":null
+                        },
+                        "Supply": {
+                            "description": "Calculate the supply of components in the network",
+                            "type": "number",
+                            "unit": "MWh",
+                            "minimum": 0,
+                            "maximum":null
+                        },
+                        "Withdrawal": {
+                            "description": "Calculate the withdrawal of components in the network",
+                            "type": "number",
+                            "unit": "MWh",
+                            "minimum":null,
+                            "maximum": 0
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
