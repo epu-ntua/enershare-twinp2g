@@ -7,6 +7,8 @@ import os
 import datetime 
 from streamlit import session_state as ss
 import plotly.graph_objects as go
+from P2G_case1 import network_execute
+import json
 
 network = pypsa.Network()
 st.set_page_config(layout='wide', initial_sidebar_state='expanded')
@@ -61,7 +63,6 @@ def plotly_chart_results(df):
     fig = go.Figure()
     for col in df.columns:
         fig.add_trace(go.Scatter(x=df.index, y=df[col], mode='lines', name=col))
-    # plot=st.plotly_chart(fig, use_container_width=True)
     return fig
 
 @st.cache_data
@@ -125,7 +126,6 @@ if use_case=='See use cases':
         for csv_file in csv_files:
             st.write(f'Processing {csv_file}...')
             df=read_output_csv(csv_file)
-            # df = pd.read_csv(csv_file, index_col=0, parse_dates=True)
             if  csv_file.endswith(('statistics.csv' , 'inputs.csv')):
                 st.write(df)
                 st.divider()
@@ -136,15 +136,14 @@ if use_case=='See use cases':
                 with tab1:
                     fig = plotly_chart_results(df)
                     st.plotly_chart(fig, use_container_width=True)
-                    # plotly_chart_results(df)    
                 tab2.subheader('Components Data')
                 tab2.write(df)
                 csv = convert_df(df)
                 tab2.download_button(label='Download data', data=csv, file_name='df.csv', mime='text/csv')
                 st.divider()                            
         col1, col2 = st.columns(2)
-        start = col1.date_input('Start', datetime.date(2020, 7, 22))
-        end = col2.date_input('End', datetime.date(2020, 7, 25))
+        start = col1.date_input('Start')
+        end = col2.date_input('End')
         start,end=selected_dates(start,end)
 
         st.button('Process Selected Dates', key='b4', on_click=count, args=('b4_count',))        
@@ -153,14 +152,12 @@ if use_case=='See use cases':
         if button4:
             for csv_file in csv_files:
                 dff=read_output_csv(csv_file)
-                # dff = pd.read_csv(csv_file,index_col=0, parse_dates=True)
                 filtered_df = dff[(dff.index >= start) & (dff.index <= end)]
                 if  csv_file.endswith('output_series.csv'):
                     tab1, tab2=st.tabs(['📈 Chart', '🗃 Data'])
                     with tab1:
                         fig = plotly_chart_results(filtered_df)
                         st.plotly_chart(fig, use_container_width=True)
-                        # plotly_chart_results(filtered_df)    
                     tab2.write(filtered_df) 
                                
 if use_case=='Your use case':
@@ -174,7 +171,6 @@ if use_case=='Your use case':
     with st.container(border=True):
         st.header('Buses')
         buses=st.number_input('Select your electrical network buses', min_value=1)
-        col = st.columns(buses)
         bus=[]
         data_bus=[]
         j=0
@@ -207,16 +203,15 @@ if use_case=='Your use case':
     with st.container(border=True):
         st.header('Generators')
         generators=st.number_input('Select your generators', min_value=1)
-        col = st.columns(generators)
         data_generator=[]
 
         for i in range(generators):
             st.subheader(f'Generator {i}')
             generator_bus=st.selectbox(f'Select bus for generator {i}', options=bus, key=f'generator_bus{i}')
             generator_carrier=st.selectbox(f'Select generator type {i}', ('Diesel','Coal','Natural Gas', 'Hydro','Solar','Wind'))
-            generator_p_nom=st.number_input(f'Generator {i} nominal power (MW)', value=5.0, min_value=0.0, help='')
-            generator_capital_cost=st.number_input(f'Generator {i} capital cost (€/MW)', value=0, min_value=0)
-            generator_marginal_cost=st.number_input(f'Generator {i} marginal cost (€/MWh)', value=50, min_value=0)
+            generator_p_nom=st.number_input(f'Generator {i} nominal power (MW)', min_value=0.0, help='')
+            generator_capital_cost=st.number_input(f'Generator {i} capital cost (€/MW)', min_value=0.0)
+            generator_marginal_cost=st.number_input(f'Generator {i} marginal cost (€/MWh)', min_value=0.0)
 
             if generator_carrier=='Solar':
                 res_source_type=st.radio('Select your pv production data', ['pvlib','csv file','TimescaleDB'],key=f'pv_data{i}', captions=['*PVLib is a python library that generates pv production data*', '*Path to your pv production data*'])            
@@ -224,9 +219,17 @@ if use_case=='Your use case':
                     j+=1
                     st.info("""
                             Upload a file in format: Datetime, GR_solar_generation. \n\r Datetime format: %Y-%m-%d %H:%M:%S+00:00 (e.g. 2018-01-01 09:00:00+00:00)\n\r GR_solar_generation must be in MW. 
-                            """, icon="ℹ️")
-                    csv_upload_format=pd.read_csv('pv_data.csv', delimiter=',',index_col=0, parse_dates=True)
-                    st.dataframe(csv_upload_format['GR_solar_generation']['2018-01-01 09:00:00+00:00':'2018-01-01 13:00:00+00:00'])
+                            """, icon="ℹ️")                    
+                    st.markdown(
+                    """
+                    |Datetime |GR_solar_generation |
+                    |- | -| 
+                    |2018-01-01 10:00:00 | 2.566 |
+                    |2018-01-01 11:00:00 | 3.8 |
+                    |2018-01-01 12:00:00 | 6.842 |
+                    |... |... |
+                    """
+                    )
                     uploaded = st.file_uploader('Choose a file for pv production', type='csv', key=f'res_source_type{i}')
                     if uploaded is not None:
                         df=read_uploaded_csv(uploaded)
@@ -243,8 +246,13 @@ if use_case=='Your use case':
                             res_source_uri=f'pv_data{j}.csv'
                     else:
                         res_source_uri=None
-                if res_source_type=='pvlib':
+                elif res_source_type=='pvlib':
                     res_source_uri=None
+                elif res_source_type=='TimescaleDB':
+                    col1,col2=st.columns(2)
+                    start_date=col1.date_input('Select start date')
+                    end_date=col2.date_input('Select end date')
+                    res_source_uri=f"*&and=(timestamp.gte.{start_date},timestamp.lte.{end_date})"
 
             if generator_carrier=='Wind':
                 res_source_type=st.radio('Select your wind production data', ['csv file','TimescaleDB'],key=f'wind_data{i}', captions=['*Path to your pv production data*'])            
@@ -253,12 +261,19 @@ if use_case=='Your use case':
                     st.info("""
                             Upload a file in format: Datetime, GR_wind_onshore_generation_actual. \n\r Datetime format: %Y-%m-%d %H:%M:%S+00:00 (e.g. 2018-01-01 09:00:00+00:00)\n\r GR_wind_onshore_generation_actual must be in MW. 
                             """, icon="ℹ️")
-                    csv_upload_format=pd.read_csv('wind_data.csv', delimiter=',',index_col=0, parse_dates=True)
-                    st.dataframe(csv_upload_format['2018-01-01 09:00:00+00:00':'2018-01-01 13:00:00+00:00'])
+                    st.markdown(
+                    """
+                    |Datetime |GR_wind_onshore_generation_actual |
+                    |- | -| 
+                    |2018-01-01 10:00:00 | 2.566 |
+                    |2018-01-01 11:00:00 | 3.8 |
+                    |2018-01-01 12:00:00 | 6.842 |
+                    |... |... |
+                    """
+                    )
                     uploaded = st.file_uploader('Choose a file for wind production', type='csv', key=f'res_wind_data{i}')
                     if uploaded is not None:
                         df=read_uploaded_csv(uploaded)
-                        # df = pd.read_csv(uploaded, delimiter=',', parse_dates=True)
                         expected_columns = ['Datetime', 'GR_wind_onshore_generation_actual']
                         if not set(expected_columns).issubset(df.columns):
                             st.error('Upload a file in format: Datetime, GR_wind_onshore_generation_actual')
@@ -271,9 +286,11 @@ if use_case=='Your use case':
                             res_source_uri = f'wind_data{l}.csv'
                     else:
                         res_source_uri=None
-                else:
-                    res_source_type = None
-                    res_source_uri=None
+                elif res_source_type == 'TimescaleDB':
+                    col1,col2=st.columns(2)
+                    start_date=col1.date_input('Select start date')
+                    end_date=col2.date_input('Select end date')
+                    res_source_uri=f"*&and=(timestamp.gte.{start_date},timestamp.lte.{end_date})"
 
             if generator_carrier not in (('Solar','Wind')):
                 res_source_type = None
@@ -294,8 +311,7 @@ if use_case=='Your use case':
 
     with st.container(border=True):
         st.header('Lines')
-        lines=st.number_input('Select your lines', 1, 10)
-        col = st.columns(lines)
+        lines=st.number_input('Select your lines', min_value=0)
         line=[]
         data_line=[]
 
@@ -317,45 +333,67 @@ if use_case=='Your use case':
     with st.container(border=True):
         st.header('Loads')
         loads=st.number_input('Select your load buses', min_value=1)
-        col = st.columns(loads)
         data_load=[]
         k=0
-        investment_period=st.number_input('Investment period', 0,25,5)
+        # investment_period=st.number_input('Investment period', 0,25,5)
         
         for i in range(loads):
             k+=1
             st.subheader(f'Load {i}')
             load_buses=st.selectbox('Load in bus:', bus, key=f'load_bus{i}')   
-            load_carriers='AC'
-            st.info("""
-                    Upload a file in format: Datetime, GR_load. \n\r Datetime format: %Y-%m-%d %H:%M:%S+00:00 (e.g. 2018-01-01 09:00:00+00:00)\n\r GR_load must be in MW. 
-                    """, icon="ℹ️")
-            csv_upload_format=pd.read_csv('load_data.csv', delimiter=',',index_col=0, parse_dates=True)
-            st.dataframe(csv_upload_format['2018-01-01 09:00:00+00:00':'2018-01-01 13:00:00+00:00'])
-            uploaded = st.file_uploader('Choose a file for load', type='csv', key=f'load_data{i}')
-            if uploaded is not None:
-                df=read_uploaded_csv(uploaded)
-                # df = pd.read_csv(uploaded, delimiter=',', parse_dates=True)
-                expected_columns = ['Datetime', 'GR_load']
-                if not set(expected_columns).issubset(df.columns):
-                    st.error('Upload a file in format: Datetime, GR_load')
+            load_carriers=st.selectbox(f'Select load type {i}', ('AC','Natural Gas', 'hydrogen'))
+
+            load_source_type=st.radio('Select your load data', ['csv file','TimescaleDB'],key=f'load_source_type_data{i}', captions=['*Path to your load data*'])            
+            if load_source_type=='csv file':
+                st.info("""
+                        Upload a file in format: Datetime, GR_load. \n\r Datetime format: %Y-%m-%d %H:%M:%S+00:00 (e.g. 2018-01-01 09:00:00+00:00)\n\r GR_load must be in MW. 
+                        """, icon="ℹ️")
+                st.markdown(
+                    """
+                    | Datetime            | GR_load |
+                    |---------------------|---------------------|
+                    | 2018-01-01 10:00:00 | 0                   |
+                    | 2018-01-01 11:00:00 | 1.175               |
+                    | 2018-01-01 12:00:00 | 2.55                |
+                    | ...                 | ...                 |
+                    """
+                )
+                uploaded = st.file_uploader('Choose a file for load', type='csv', key=f'load_data{i}')
+                if uploaded is not None:
+                    df=read_uploaded_csv(uploaded)
+                    expected_columns = ['Datetime', 'GR_load']
+                    if not set(expected_columns).issubset(df.columns):
+                        st.error('Upload a file in format: Datetime, GR_load')
+                    else:
+                        df.set_index(['Datetime'], inplace=True)
+                        for date in df.index:
+                            validate_date_format(date)
+                        st.dataframe(df)
+                        df.to_csv(f'load_data{k}.csv', index=True, header=True) 
+                        load_source_type='csv file'
+                        load_source_uri=f'load_data{k}.csv' 
+                else:                
+                    load_source_uri=None
+            elif load_source_type=='TimescaleDB':
+                col1,col2=st.columns(2)
+                start_date=col1.date_input('Select load data start date')
+                end_date=col2.date_input('Select load data end date')
+                if load_carriers=='Natural Gas':
+                    with open('desfa_flows_hourly_archive.json', 'r') as file:
+                        data = json.load(file)
+                    allowed_values=data['properties']['point_id']['allowed_values']
+                    exit_point=st.selectbox('Exit Point', allowed_values)
+                    st.write(f'Exit point: {exit_point}')
+                    load_source_uri=f"*&and=(timestamp.gte.{start_date},timestamp.lte.{end_date},point_id.eq.{exit_point})"
                 else:
-                    df.set_index(['Datetime'], inplace=True)
-                    for date in df.index:
-                        validate_date_format(date)
-                    st.dataframe(df)
-                    df.to_csv(f'load_data{k}.csv', index=True, header=True) 
-                    load_source_type='csv file'
-                    load_source_uri=f'load_data{k}.csv' 
-            else:
-                load_source_type=None 
-                load_source_uri=None
+                    load_source_uri=f"*&and=(timestamp.gte.{start_date},timestamp.lte.{end_date})"
+
 
             load_data={
             'Component':'Load',
             'carrier': load_carriers,
             'bus': load_buses, 
-            'investment_period':investment_period,
+            'investment_period':None,#investment_period,
             'input_series_source_type':load_source_type,
             'input_series_source_uri':load_source_uri,
             }
@@ -366,20 +404,19 @@ if use_case=='Your use case':
         st.header('Links')
         st.info("""
                 The link is a component for controllable directed flows between two buses, bus0 and bus1 with arbitrary energy carriers.\n
-                The Link component can be used for any element with a controllable power flow: Energy conversion from AC to hydrogen network via **Electrolysis** and vice versa via **Fuel Cell**
+                The Link component can be used for any element with a controllable power flow: Energy conversion from AC to hydrogen network via **Electrolysis** and vice versa via **Fuel Cell** and energy conversion from hydrogen to synthetic natural gas via **Methanation**.
                 """,icon="ℹ️")
-        links=st.number_input('Select your links', min_value=2)
-        col = st.columns(links)
+        links=st.number_input('Select your links', min_value=0)
         data_link=[]
 
         for i in range(links):
-            link_carriers=st.radio(f'Select link {i} type', options=['Electrolysis','Fuel Cell'], key=f'link_carrier{i}')
+            link_carriers=st.radio(f'Select link {i} type', options=['Electrolysis','Fuel Cell', 'Methanation'], key=f'link_carrier{i}')
             st.subheader(link_carriers)
             link_bus0=st.selectbox(f'{link_carriers} link from bus:', bus, key=f'link_bus0{i}')
             link_bus1=st.selectbox(f'{link_carriers} link to bus:', bus, key=f'link_bus1{i}')
-            link_p_nom=st.number_input(f'{link_carriers} nominal power (MW)',min_value=0.0, value=2.5, key=f'link_p_nom{i}', help='Limit of active power which can pass through link')
-            link_capital_cost=st.number_input(f'{link_carriers}  capital cost (€/MW)',min_value=0, value=1000000, step=100, key=f'link_capex{i}', help='Capital cost of extending nominal power by 1 MW')
-            link_marginal_cost=st.number_input(f'{link_carriers} marginal cost (€/MWh)',min_value=0, value=110, key=f'link_opex{i}', help='Marginal cost of transfering 1 MWh (before efficiency losses) from bus0 to bus1')
+            link_p_nom=st.number_input(f'{link_carriers} nominal power (MW)',min_value=0.0, key=f'link_p_nom{i}', help='Limit of active power which can pass through link')
+            link_capital_cost=st.number_input(f'{link_carriers}  capital cost (€/MW)',min_value=0.0, step=100.0, key=f'link_capex{i}', help='Capital cost of extending nominal power by 1 MW')
+            link_marginal_cost=st.number_input(f'{link_carriers} marginal cost (€/MWh)',min_value=0.0, key=f'link_opex{i}', help='Marginal cost of transfering 1 MWh (before efficiency losses) from bus0 to bus1')
             link_efficiency=st.number_input(f'{link_carriers} efficiency',min_value=0.0, value=0.6, key=f'link_efficiency{i}', help='Efficiency of power transfer from bus0 to bus1')
 
             link_data={
@@ -398,16 +435,15 @@ if use_case=='Your use case':
     
     with st.container(border=True):
         st.header('Storage')
-        stores=st.number_input('Select your stores', min_value=1)
-        col = st.columns(stores)
+        stores=st.number_input('Select your stores', min_value=0)
         data_store=[]
 
         for i in range(stores):
             store_carrier=st.radio(f'Select store {i} type', options=['Hydrogen Store'], key=(f'store_carrier {i}'))
             store_buses=st.selectbox(f'{store_carrier} {i} bus:', options=bus, key=(f'store_bus {i}'))
-            store_p_nom=st.number_input(f'{store_carrier} {i} nominal energy capacity (MWh)',min_value=0.0, value=15.0, key=(f'store_p_nom {i}'))
-            store_capital_cost=st.number_input(f'{store_carrier} {i} capital cost (€/MWh)', min_value=0, value=40000, step=100, key=(f'store_capex {i}'), help='Capital cost of extending nominal energy capacity by 1 MWh')
-            store_marginal_cost=st.number_input(f'{store_carrier} {i} marginal cost (€/MWh)',min_value=0, value=10, key=(f'store_opex {i}'), help='Marginal cost of production of 1 MWh')
+            store_p_nom=st.number_input(f'{store_carrier} {i} nominal energy capacity (MWh)',min_value=0.0, key=(f'store_p_nom {i}'))
+            store_capital_cost=st.number_input(f'{store_carrier} {i} capital cost (€/MWh)', min_value=0.0, step=100.0, key=(f'store_capex {i}'), help='Capital cost of extending nominal energy capacity by 1 MWh')
+            store_marginal_cost=st.number_input(f'{store_carrier} {i} marginal cost (€/MWh)',min_value=0.0, key=(f'store_opex {i}'), help='Marginal cost of production of 1 MWh')
 
             store_data={
                 'Component':'Store',
@@ -462,9 +498,9 @@ if use_case=='Your use case':
                 
                 inputs.to_csv('data_inputs2.csv', index=False)
 
-                from P2G_case1 import network
+                network_execute()
                 
-                st.write(inputs) 
+                # st.write(inputs) 
                 uploaded=f'./results/{use_case_name}/{timestamp}/outputs/statistics.csv'
                 statistics=read_uploaded_csv(uploaded)
                 st.write(statistics)
@@ -477,7 +513,6 @@ if use_case=='Your use case':
                 with tab1:
                     fig = plotly_chart_results(df)
                     st.plotly_chart(fig, use_container_width=True)    
-                    # plotly_chart_results(df)
                 tab2.subheader('Components Data')
                 tab2.write(df)
                 csv = convert_df(df)
@@ -489,8 +524,8 @@ if use_case=='Your use case':
                 time_convert(time_lapsed)
             
             col1, col2 = st.columns(2)
-            start = col1.date_input('Start', datetime.date(2020, 7, 22))
-            end = col2.date_input('End', datetime.date(2020, 7, 25))
+            start = col1.date_input('Start')
+            end = col2.date_input('End')
             
             start,end=selected_dates(start,end)
 
@@ -503,5 +538,4 @@ if use_case=='Your use case':
                 with tab5:
                     fig = plotly_chart_results(filtered_df)
                     st.plotly_chart(fig, use_container_width=True)        
-                    # plotly_chart_results(filtered_df)
                 tab6.write(filtered_df) 

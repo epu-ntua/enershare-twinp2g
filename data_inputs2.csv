@@ -1,11 +1,11 @@
 Component,carrier,bus,from_bus,to_bus,p_nom,capital_cost,marginal_cost,input_series_source_type,input_series_source_uri,use_case_name,investment_period,efficiency,timestamp
-Bus,AC,Bus 0,,,,,,,,Usecase 2030,,,
-Bus,AC,Bus 1,,,,,,,,Usecase 2030,,,
-Bus,hydrogen,Bus 2,,,,,,,,Usecase 2030,,,
-Generator,Diesel,Bus 0,,,5.0,0.0,500.0,,,,,,
-Generator,Solar,Bus 1,,,1.0,0.0,24.0,csv file,pv_data1.csv,,,,
+Bus,AC,Bus 0,,,,,,,,,,,2024.05.29 12.50.05
+Bus,AC,Bus 1,,,,,,,,,,,2024.05.29 12.50.05
+Bus,hydrogen,Bus 2,,,,,,,,,,,2024.05.29 12.50.05
+Generator,Diesel,Bus 0,,,7000.0,0.0,300.0,,,,,,
+Generator,Solar,Bus 1,,,1.0,0.0,10.0,pvlib,,,,,
 Line,AC,,Bus 0,Bus 1,,,,,,,,,
-Load,AC,Bus 1,,,,,,csv file,load_data1.csv,,5.0,,
-Link,Electrolysis,,Bus 1,Bus 2,2.5,350000.0,30.0,,,,,0.7,
-Link,Fuel Cell,,Bus 2,Bus 1,1.2,350000.0,30.0,,,,,0.6,
-Store,Hydrogen Store,Bus 2,,,15.0,30000.0,10.0,,,,,,
+Load,AC,Bus 1,,,,,,TimescaleDB,"*&and=(timestamp.gte.2024-01-01,timestamp.lte.2024-05-29)",,,,
+Link,Electrolysis,,Bus 1,Bus 2,2.0,100000.0,0.0,,,,,0.6,
+Link,Fuel Cell,,Bus 2,Bus 1,2.0,100000.0,0.0,,,,,0.6,
+Store,Hydrogen Store,Bus 2,,,15.0,10000.0,0.0,,,,,,
