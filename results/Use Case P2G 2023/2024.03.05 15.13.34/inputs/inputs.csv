@@ -1,0 +1,11 @@
+Component,carrier,bus,from_bus,to_bus,p_nom,capital_cost,marginal_cost,input_series_source_type,input_series_source_uri,use_case_name,investment_period,efficiency,timestamp
+Bus,AC,Bus 0,,,,,,,,Use Case P2G 2023,,,2024.03.05 15.13.34
+Bus,AC,Bus 1,,,,,,,,Use Case P2G 2023,,,2024.03.05 15.13.34
+Bus,hydrogen,Bus 2,,,,,,,,Use Case P2G 2023,,,2024.03.05 15.13.34
+Generator,Diesel,Bus 0,,,5.0,0.0,373.1,,,,,,
+Generator,Solar,Bus 1,,,1.0,0.0,10.0,csv file,pv_data1.csv,,,,
+Line,AC,,Bus 0,Bus 1,,,,,,,,,
+Load,AC,Bus 1,,,,,,csv file,load_data1.csv,,5.0,,
+Link,Electrolysis,,Bus 1,Bus 2,2.5,1227200.0,0.0,,,,,0.64,
+Link,Fuel Cell,,Bus 2,Bus 1,1.2,1414740.0,0.0,,,,,0.6,
+Store,Hydrogen Store,Bus 2,,,15.0,28674.0,0.0,,,,,,
