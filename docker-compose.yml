@@ -1,0 +1,19 @@
+services:
+  twinp2g:
+    container_name: twinp2g-container
+    restart: always
+    image: twinp2g-image3
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    expose:
+      - 8501
+    ports:
+      - 8501:8501
+    environment:
+      - ENV PATH="/root/miniconda3/bin:${PATH}"
+    volumes:
+      - results:/app/results
+
+volumes:
+  results:  
