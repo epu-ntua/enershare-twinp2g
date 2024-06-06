@@ -64,7 +64,7 @@ def investment_period_count(data_load):
     return investment_period
 
 def calls(endpoint,params):
-    
+    df=None
     url = 'https://enershare.epu.ntua.gr/consumer-data-app/openapi/12.0.2/'    # https://<baseurl>/<data-app-path>/openapi/<beckend-service-version>/
     jwt_token = 'APIKEY-sgqgCPJWgQjmMWrKLAmkETDE' 
 
@@ -100,7 +100,7 @@ def network_execute():
 
     logging.basicConfig(level="INFO")
     network = pypsa.Network()
-    inputs2=pd.read_csv('data_inputs2.csv')
+    inputs2=pd.read_csv('data/data_inputs2.csv')
     inputs2.set_index(['Component','carrier'],inplace=True)
     inputs2
 
@@ -135,7 +135,7 @@ def network_execute():
         load_data_source_type=inputs2['input_series_source_type']['Load'][i]
         if load_data_source_type=='csv file':
             load_data_uri=inputs2['input_series_source_uri']['Load'][i]
-            data_load=read_csv(load_data_uri, network)
+            data_load=read_csv(f'data/{load_data_uri}', network)
             p_set=np.array(data_load['GR_load'])
         else:
             if carrier=='AC':
@@ -163,7 +163,7 @@ def network_execute():
             # p_min_pu=0    
             if generator_data_source_type =='csv file':
                 pv_data=inputs2['input_series_source_uri']['Generator'][i]
-                data_pvprod=read_csv(pv_data, network)
+                data_pvprod=read_csv(f'data/{pv_data}', network)
                 p_max_pu_value = np.array(data_pvprod['GR_solar_generation'])
             elif generator_data_source_type=='pvlib':
                 data_pvprod=pvlib_simulation(data_load)
@@ -180,7 +180,7 @@ def network_execute():
             # p_min_pu=0
             if generator_data_source_type =='csv file':
                 wind_data_source_uri=inputs2['input_series_source_uri']['Generator'][i]
-                data_windprod=read_csv(wind_data_source_uri, network)
+                data_windprod=read_csv(f'data/{wind_data_source_uri}', network)
                 p_max_pu_value = np.array(data_windprod['GR_wind_onshore_generation_actual'])
             else: 
                 endpoint = 'actual_generation_per_type'  
@@ -277,7 +277,7 @@ def network_execute():
     statistics=network.statistics().round(2)
 
     #  
-    network.iplot()
+    # network.iplot()
 
     #  
     if links==0 and stores==0:

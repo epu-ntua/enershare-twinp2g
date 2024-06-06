@@ -242,7 +242,7 @@ if use_case=='Your use case':
                             for date in df.index:
                                validate_date_format(date)
                             st.dataframe(df)
-                            df.to_csv(f'pv_data{j}.csv', index=True, header=True)
+                            df.to_csv(f'./data/pv_data{j}.csv', index=True, header=True)
                             res_source_uri=f'pv_data{j}.csv'
                     else:
                         res_source_uri=None
@@ -282,7 +282,7 @@ if use_case=='Your use case':
                             for date in df.index:
                                validate_date_format(date)
                             st.dataframe(df)
-                            df.to_csv(f'wind_data{l}.csv', index=True, header=True)
+                            df.to_csv(f'./data/wind_data{l}.csv', index=True, header=True)
                             res_source_uri = f'wind_data{l}.csv'
                     else:
                         res_source_uri=None
@@ -369,7 +369,7 @@ if use_case=='Your use case':
                         for date in df.index:
                             validate_date_format(date)
                         st.dataframe(df)
-                        df.to_csv(f'load_data{k}.csv', index=True, header=True) 
+                        df.to_csv(f'./data/load_data{k}.csv', index=True, header=True) 
                         load_source_type='csv file'
                         load_source_uri=f'load_data{k}.csv' 
                 else:                
@@ -379,7 +379,7 @@ if use_case=='Your use case':
                 start_date=col1.date_input('Select load data start date')
                 end_date=col2.date_input('Select load data end date')
                 if load_carriers=='Natural Gas':
-                    with open('desfa_flows_hourly_archive.json', 'r') as file:
+                    with open('data/desfa_flows_hourly_archive.json', 'r') as file:
                         data = json.load(file)
                     allowed_values=data['properties']['point_id']['allowed_values']
                     exit_point=st.selectbox('Exit Point', allowed_values)
@@ -496,7 +496,7 @@ if use_case=='Your use case':
 
                 inputs = pd.concat([df_bus, df_generator, df_line, df_load, df_link, df_H2], ignore_index=True)
                 
-                inputs.to_csv('data_inputs2.csv', index=False)
+                inputs.to_csv('data/data_inputs2.csv', index=False)
 
                 network_execute()
                 
