@@ -2,3 +2,6 @@ plotly==5.18.0
 pvlib==0.10.2
 pypsa==0.26.0
 streamlit==1.29.0
+python-dotenv==1.0.0
+SQLAlchemy==2.0.23
+psycopg2-binary==2.9.9

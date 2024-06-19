@@ -7,8 +7,9 @@ import os
 import datetime 
 from streamlit import session_state as ss
 import plotly.graph_objects as go
-from P2G_case1 import network_execute
+from P2G_case1 import network_execute, upload_results
 import json
+import asyncio
 
 network = pypsa.Network()
 st.set_page_config(layout='wide', initial_sidebar_state='expanded')
@@ -214,7 +215,7 @@ if use_case=='Your use case':
             generator_marginal_cost=st.number_input(f'Generator {i} marginal cost (€/MWh)', min_value=0.0)
 
             if generator_carrier=='Solar':
-                res_source_type=st.radio('Select your pv production data', ['pvlib','csv file','TimescaleDB'],key=f'pv_data{i}', captions=['*PVLib is a python library that generates pv production data*', '*Path to your pv production data*'])            
+                res_source_type=st.radio('Select your pv production data', ['pvlib','csv file','TimescaleDB'],key=f'pv_data{i}', captions=['*PVLib is a python library that generates pv production data*', '*Upload your pv production data*'])            
                 if res_source_type=='csv file':
                     j+=1
                     st.info("""
@@ -255,7 +256,7 @@ if use_case=='Your use case':
                     res_source_uri=f"*&and=(timestamp.gte.{start_date},timestamp.lte.{end_date})"
 
             if generator_carrier=='Wind':
-                res_source_type=st.radio('Select your wind production data', ['csv file','TimescaleDB'],key=f'wind_data{i}', captions=['*Path to your pv production data*'])            
+                res_source_type=st.radio('Select your wind production data', ['csv file','TimescaleDB'],key=f'wind_data{i}', captions=['*Upload your wind production data*'])            
                 if res_source_type=='csv file':
                     l+=1
                     st.info("""
@@ -320,12 +321,18 @@ if use_case=='Your use case':
             line.append(f'Line {i}')
             line_bus0=st.selectbox('From bus:', bus, key=f'line_bus0{i}')  
             line_bus1=st.selectbox('To bus:', bus, key=f'line_bus1{i}')
-
+            line_reactance=st.number_input(f'Line {i} series reactance (Ohm)', min_value=0.0, help='')
+            line_resistance=st.number_input(f'Line {i} series resistance (Ohm)', min_value=0.0, help='')
+            # linetype=st.dataframe(network.line_types)
+            # line_type=st.selectbox('',options=network.line_types.index)
+            # length=st.number_input(f'Line {i} lenght (km)', min_value=0.0, help='')
             line_data = {
             'Component':'Line',
             'carrier': 'AC',        
             'from_bus': line_bus0,
             'to_bus': line_bus1,
+            'series_reactance':line_reactance,
+            'series_resistance': line_resistance
             }
             data_line.append(line_data)
             st.divider()
@@ -343,7 +350,7 @@ if use_case=='Your use case':
             load_buses=st.selectbox('Load in bus:', bus, key=f'load_bus{i}')   
             load_carriers=st.selectbox(f'Select load type {i}', ('AC','Natural Gas', 'hydrogen'))
 
-            load_source_type=st.radio('Select your load data', ['csv file','TimescaleDB'],key=f'load_source_type_data{i}', captions=['*Path to your load data*'])            
+            load_source_type=st.radio('Select your load data', ['csv file','TimescaleDB'],key=f'load_source_type_data{i}', captions=['*Upload your load data*'])            
             if load_source_type=='csv file':
                 st.info("""
                         Upload a file in format: Datetime, GR_load. \n\r Datetime format: %Y-%m-%d %H:%M:%S+00:00 (e.g. 2018-01-01 09:00:00+00:00)\n\r GR_load must be in MW. 
@@ -466,7 +473,7 @@ if use_case=='Your use case':
             ss.b2_count=0
         return bool(ss.b1_count % 2)
     
-    col = st.columns(14)
+    col = st.columns(10)
     col[0].button('Submit', key='b1', on_click=count, args=('b1_count',), type='primary', disabled=submit_disabled())
     col[1].button('Stop', key='b6', on_click=count, args=('b6_count',))
     
@@ -498,7 +505,9 @@ if use_case=='Your use case':
                 
                 inputs.to_csv('data/data_inputs2.csv', index=False)
 
-                network_execute()
+                # network_execute()
+                output_path, input_path = network_execute()
+                asyncio.run(upload_results(output_path, input_path))
                 
                 # st.write(inputs) 
                 uploaded=f'./results/{use_case_name}/{timestamp}/outputs/statistics.csv'

@@ -14,7 +14,8 @@ import math
 from pvlib_folder.pvlibdata import pvlib_simulation
 import requests
 import json
-
+import asyncio
+from database_upload_csv import upload_csv
 #   
 def fillna(file):
     file=file.fillna(method='pad')
@@ -37,7 +38,6 @@ def read_csv(data, network):
     data_csv.set_index(['Datetime'], inplace=True)
     data_csv=fillna(data_csv)
     # data_csv=dates(data_csv) 
-    network.set_snapshots(data_csv.index)
     return data_csv 
 # 
 def components_count(carrier, inputs2):
@@ -124,7 +124,9 @@ def network_execute():
     for i in range(lines):
         bus0 = inputs2['from_bus']['Line'][i]
         bus1 = inputs2['to_bus']['Line'][i]
-        network.add("Line", f"Line {bus0} - {bus1}", bus0=bus0, bus1=bus1, r=0.01, x=0.1, s_nom_extendable=True)
+        r=inputs2['series_reactance']['Line'][i]
+        x=inputs2['series_resistance']['Line'][i]
+        network.add("Line", f"Line {bus0} - {bus1}", bus0=bus0, bus1=bus1, r=r, x=x, s_nom_extendable=True)
     network.lines
     # 
     # ## Loads
@@ -136,6 +138,7 @@ def network_execute():
         if load_data_source_type=='csv file':
             load_data_uri=inputs2['input_series_source_uri']['Load'][i]
             data_load=read_csv(f'data/{load_data_uri}', network)
+            network.set_snapshots(data_load.index)
             p_set=np.array(data_load['GR_load'])
         else:
             if carrier=='AC':
@@ -293,13 +296,36 @@ def network_execute():
     #   creates a folder to save the files
     use_case_name=inputs2['use_case_name']['Bus'][0]
     timestamp=inputs2['timestamp']['Bus'][0]
-    os.makedirs(f"./results/{use_case_name}/{timestamp}")
-    os.makedirs(f"./results/{use_case_name}/{timestamp}/inputs")
-    os.makedirs(f"./results/{use_case_name}/{timestamp}/outputs")
-    # 
-    df.to_csv(f"./results/{use_case_name}/{timestamp}/outputs/output_series.csv",index=True)  
-    statistics.to_csv(f"./results/{use_case_name}/{timestamp}/outputs/statistics.csv") 
-    inputs2.to_csv(f"./results/{use_case_name}/{timestamp}/inputs/inputs.csv")
+    output_path = f"./results/{use_case_name}/{timestamp}/outputs"
+    input_path = f"./results/{use_case_name}/{timestamp}/inputs"
+
+    os.makedirs(output_path, exist_ok=True)
+    os.makedirs(input_path, exist_ok=True)
+
+    df.to_csv(f"{output_path}/output_series.csv", index=True)
+    statistics.to_csv(f"{output_path}/statistics.csv")
+    inputs2.to_csv(f"{input_path}/inputs.csv")
+
+    return output_path, input_path
+
+async def upload_results(output_path, input_path):
+    schema_name = 'twinp2g_results'
+
+    table_files = {
+        'output_series': os.path.join(output_path, "output_series.csv"),
+        'statistics': os.path.join(output_path, "statistics.csv"),
+        'inputs': os.path.join(input_path, "inputs.csv")
+    }
+    results = []
+
+    for table_name, csv_file in table_files.items():
+        result = await upload_csv(csv_file=csv_file, table_name=table_name, schema_name=schema_name)
+        results.append(result)
+    
+    for result in results:
+        print(result)
+
 #  
 if __name__ == "__main__":
-    network_execute()
+    output_path, input_path = network_execute()
+    asyncio.run(upload_results(output_path, input_path))

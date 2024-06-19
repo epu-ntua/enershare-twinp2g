@@ -1,3 +1,4 @@
+version: '3'
 services:
   twinp2g:
     container_name: twinp2g-container
@@ -11,9 +12,15 @@ services:
     ports:
       - 8501:8501
     environment:
-      - ENV PATH="/root/miniconda3/bin:${PATH}"
+      - ENV_PATH="/root/miniconda3/bin:${PATH}"
     volumes:
       - results:/app/results
+    networks:
+      - ds_viz_network
+
+networks: 
+  ds_viz_network:
+    external: true
 
 volumes:
   results:  
