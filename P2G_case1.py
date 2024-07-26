@@ -16,6 +16,7 @@ import requests
 import json
 import asyncio
 from database_upload_csv import upload_csv
+from dotenv import load_dotenv
 #   
 def fillna(file):
     file=file.fillna(method='pad')
@@ -65,13 +66,16 @@ def investment_period_count(data_load):
 
 def calls(endpoint,params):
     df=None
-    url = 'https://enershare.epu.ntua.gr/consumer-data-app/openapi/12.0.2/'    # https://<baseurl>/<data-app-path>/openapi/<beckend-service-version>/
-    jwt_token = 'APIKEY-sgqgCPJWgQjmMWrKLAmkETDE' 
+    load_dotenv()
+    url = os.environ.get('CONNECTOR_URL')
+    jwt_token = os.environ.get('JWT_TOKEN')
+    forward_id = os.environ.get('FORWARD_ID')
+    forward_sender = os.environ.get('FORWARD_SENDER')
 
     headers = {
-        'Authorization': 'Bearer' + jwt_token,
-        'Forward-Id': 'urn:ids:enershare:connectors:NTUA:Provider:Pilot4',         # reciever connector ID
-        'Forward-Sender': 'urn:ids:enershare:connectors:NTUA:Consumer:ConsumerAgent'      # Sender connector ID
+        'Authorization': 'Bearer ' + jwt_token,
+        'Forward-Id': forward_id,         # reciever connector ID
+        'Forward-Sender': forward_sender      # Sender connector ID
     }
     response = requests.get(url+endpoint, headers=headers, params=params)
 
@@ -116,7 +120,9 @@ def network_execute():
     for i in range(buses):
         carrier=inputs2.loc['Bus'].index[i]
         bus=inputs2['bus']['Bus'][i]
-        network.add("Bus",name=bus, carrier=carrier)
+        longitude=inputs2['longitude']['Bus'][i]
+        latitude=inputs2['latitude']['Bus'][i]
+        network.add("Bus",name=bus, carrier=carrier, x=longitude, y=latitude)
     network.buses
     #
     # ## Lines
@@ -280,6 +286,23 @@ def network_execute():
     statistics=network.statistics().round(2)
 
     #  
+    carrier_colors = {
+        'AC': 'red',
+        'hydrogen': 'green',
+        'DC': 'black',
+        'heat': 'yellow',
+        'gas': 'blue',
+    }
+
+    bus_colors = network.buses.carrier.map(carrier_colors)
+
+    fig = network.iplot(
+        bus_sizes=20,
+        bus_colors=bus_colors,
+        line_widths=2.7,
+        link_widths=2,
+        iplot=False
+    )
     # network.iplot()
 
     #  
@@ -306,9 +329,9 @@ def network_execute():
     statistics.to_csv(f"{output_path}/statistics.csv")
     inputs2.to_csv(f"{input_path}/inputs.csv")
 
-    return output_path, input_path
+    return use_case_name, timestamp, output_path, input_path, fig, network.buses, network.lines, network.links
 
-async def upload_results(output_path, input_path):
+async def upload_results(use_case_name, timestamp, output_path, input_path):
     schema_name = 'twinp2g_results'
 
     table_files = {
@@ -319,7 +342,8 @@ async def upload_results(output_path, input_path):
     results = []
 
     for table_name, csv_file in table_files.items():
-        result = await upload_csv(csv_file=csv_file, table_name=table_name, schema_name=schema_name)
+        new_table_name = f"{use_case_name}_{timestamp}_{table_name}"
+        result = await upload_csv(csv_file=csv_file, table_name=new_table_name, schema_name=schema_name)
         results.append(result)
     
     for result in results:
