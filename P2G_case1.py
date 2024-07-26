@@ -14,7 +14,9 @@ import math
 from pvlib_folder.pvlibdata import pvlib_simulation
 import requests
 import json
-
+import asyncio
+from database_upload_csv import upload_csv
+from dotenv import load_dotenv
 #   
 def fillna(file):
     file=file.fillna(method='pad')
@@ -37,7 +39,6 @@ def read_csv(data, network):
     data_csv.set_index(['Datetime'], inplace=True)
     data_csv=fillna(data_csv)
     # data_csv=dates(data_csv) 
-    network.set_snapshots(data_csv.index)
     return data_csv 
 # 
 def components_count(carrier, inputs2):
@@ -64,14 +65,17 @@ def investment_period_count(data_load):
     return investment_period
 
 def calls(endpoint,params):
-    
-    url = 'https://enershare.epu.ntua.gr/consumer-data-app/openapi/12.0.2/'    # https://<baseurl>/<data-app-path>/openapi/<beckend-service-version>/
-    jwt_token = 'APIKEY-sgqgCPJWgQjmMWrKLAmkETDE' 
+    df=None
+    load_dotenv()
+    url = os.environ.get('CONNECTOR_URL')
+    jwt_token = os.environ.get('JWT_TOKEN')
+    forward_id = os.environ.get('FORWARD_ID')
+    forward_sender = os.environ.get('FORWARD_SENDER')
 
     headers = {
-        'Authorization': 'Bearer' + jwt_token,
-        'Forward-Id': 'urn:ids:enershare:connectors:NTUA:Provider:Pilot4',         # reciever connector ID
-        'Forward-Sender': 'urn:ids:enershare:connectors:NTUA:Consumer:ConsumerAgent'      # Sender connector ID
+        'Authorization': 'Bearer ' + jwt_token,
+        'Forward-Id': forward_id,         # reciever connector ID
+        'Forward-Sender': forward_sender      # Sender connector ID
     }
     response = requests.get(url+endpoint, headers=headers, params=params)
 
@@ -100,7 +104,7 @@ def network_execute():
 
     logging.basicConfig(level="INFO")
     network = pypsa.Network()
-    inputs2=pd.read_csv('data_inputs2.csv')
+    inputs2=pd.read_csv('data/data_inputs2.csv')
     inputs2.set_index(['Component','carrier'],inplace=True)
     inputs2
 
@@ -116,7 +120,9 @@ def network_execute():
     for i in range(buses):
         carrier=inputs2.loc['Bus'].index[i]
         bus=inputs2['bus']['Bus'][i]
-        network.add("Bus",name=bus, carrier=carrier)
+        longitude=inputs2['longitude']['Bus'][i]
+        latitude=inputs2['latitude']['Bus'][i]
+        network.add("Bus",name=bus, carrier=carrier, x=longitude, y=latitude)
     network.buses
     #
     # ## Lines
@@ -124,7 +130,9 @@ def network_execute():
     for i in range(lines):
         bus0 = inputs2['from_bus']['Line'][i]
         bus1 = inputs2['to_bus']['Line'][i]
-        network.add("Line", f"Line {bus0} - {bus1}", bus0=bus0, bus1=bus1, r=0.01, x=0.1, s_nom_extendable=True)
+        r=inputs2['series_reactance']['Line'][i]
+        x=inputs2['series_resistance']['Line'][i]
+        network.add("Line", f"Line {bus0} - {bus1}", bus0=bus0, bus1=bus1, r=r, x=x, s_nom_extendable=True)
     network.lines
     # 
     # ## Loads
@@ -135,7 +143,8 @@ def network_execute():
         load_data_source_type=inputs2['input_series_source_type']['Load'][i]
         if load_data_source_type=='csv file':
             load_data_uri=inputs2['input_series_source_uri']['Load'][i]
-            data_load=read_csv(load_data_uri, network)
+            data_load=read_csv(f'data/{load_data_uri}', network)
+            network.set_snapshots(data_load.index)
             p_set=np.array(data_load['GR_load'])
         else:
             if carrier=='AC':
@@ -163,7 +172,7 @@ def network_execute():
             # p_min_pu=0    
             if generator_data_source_type =='csv file':
                 pv_data=inputs2['input_series_source_uri']['Generator'][i]
-                data_pvprod=read_csv(pv_data, network)
+                data_pvprod=read_csv(f'data/{pv_data}', network)
                 p_max_pu_value = np.array(data_pvprod['GR_solar_generation'])
             elif generator_data_source_type=='pvlib':
                 data_pvprod=pvlib_simulation(data_load)
@@ -180,7 +189,7 @@ def network_execute():
             # p_min_pu=0
             if generator_data_source_type =='csv file':
                 wind_data_source_uri=inputs2['input_series_source_uri']['Generator'][i]
-                data_windprod=read_csv(wind_data_source_uri, network)
+                data_windprod=read_csv(f'data/{wind_data_source_uri}', network)
                 p_max_pu_value = np.array(data_windprod['GR_wind_onshore_generation_actual'])
             else: 
                 endpoint = 'actual_generation_per_type'  
@@ -277,7 +286,24 @@ def network_execute():
     statistics=network.statistics().round(2)
 
     #  
-    network.iplot()
+    carrier_colors = {
+        'AC': 'red',
+        'hydrogen': 'green',
+        'DC': 'black',
+        'heat': 'yellow',
+        'gas': 'blue',
+    }
+
+    bus_colors = network.buses.carrier.map(carrier_colors)
+
+    fig = network.iplot(
+        bus_sizes=20,
+        bus_colors=bus_colors,
+        line_widths=2.7,
+        link_widths=2,
+        iplot=False
+    )
+    # network.iplot()
 
     #  
     if links==0 and stores==0:
@@ -293,13 +319,37 @@ def network_execute():
     #   creates a folder to save the files
     use_case_name=inputs2['use_case_name']['Bus'][0]
     timestamp=inputs2['timestamp']['Bus'][0]
-    os.makedirs(f"./results/{use_case_name}/{timestamp}")
-    os.makedirs(f"./results/{use_case_name}/{timestamp}/inputs")
-    os.makedirs(f"./results/{use_case_name}/{timestamp}/outputs")
-    # 
-    df.to_csv(f"./results/{use_case_name}/{timestamp}/outputs/output_series.csv",index=True)  
-    statistics.to_csv(f"./results/{use_case_name}/{timestamp}/outputs/statistics.csv") 
-    inputs2.to_csv(f"./results/{use_case_name}/{timestamp}/inputs/inputs.csv")
+    output_path = f"./results/{use_case_name}/{timestamp}/outputs"
+    input_path = f"./results/{use_case_name}/{timestamp}/inputs"
+
+    os.makedirs(output_path, exist_ok=True)
+    os.makedirs(input_path, exist_ok=True)
+
+    df.to_csv(f"{output_path}/output_series.csv", index=True)
+    statistics.to_csv(f"{output_path}/statistics.csv")
+    inputs2.to_csv(f"{input_path}/inputs.csv")
+
+    return use_case_name, timestamp, output_path, input_path, fig, network.buses, network.lines, network.links
+
+async def upload_results(use_case_name, timestamp, output_path, input_path):
+    schema_name = 'twinp2g_results'
+
+    table_files = {
+        'output_series': os.path.join(output_path, "output_series.csv"),
+        'statistics': os.path.join(output_path, "statistics.csv"),
+        'inputs': os.path.join(input_path, "inputs.csv")
+    }
+    results = []
+
+    for table_name, csv_file in table_files.items():
+        new_table_name = f"{use_case_name}_{timestamp}_{table_name}"
+        result = await upload_csv(csv_file=csv_file, table_name=new_table_name, schema_name=schema_name)
+        results.append(result)
+    
+    for result in results:
+        print(result)
+
 #  
 if __name__ == "__main__":
-    network_execute()
+    output_path, input_path = network_execute()
+    asyncio.run(upload_results(output_path, input_path))
