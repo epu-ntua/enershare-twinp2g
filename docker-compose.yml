@@ -11,6 +11,8 @@ services:
       - 8501
     ports:
       - 8501:8501
+    env_file:
+      - .env
     environment:
       - ENV_PATH="/root/miniconda3/bin:${PATH}"
     volumes:
