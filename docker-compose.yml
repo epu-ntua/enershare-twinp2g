@@ -1,7 +1,7 @@
 version: '3'
 services:
   twinp2g:
-    container_name: twinp2g-container
+    container_name: twinp2g-app
     restart: always
     image: twinp2g-image3
     build: 
@@ -9,19 +9,24 @@ services:
       dockerfile: Dockerfile
     expose:
       - 8501
-    ports:
-      - 8501:8501
+    # ports:
+    #  - 8501:8501
     env_file:
       - .env
     environment:
       - ENV_PATH="/root/miniconda3/bin:${PATH}"
     volumes:
       - results:/app/results
+    # networks:
+    #   - ds_viz_network
     networks:
-      - ds_viz_network
+      - nginx-proxy-manager_enershare_network
 
-networks: 
-  ds_viz_network:
+# networks: 
+#   ds_viz_network:
+#     external: true
+networks:
+  nginx-proxy-manager_enershare_network:
     external: true
 
 volumes:
