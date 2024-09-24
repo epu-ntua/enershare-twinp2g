@@ -7,7 +7,7 @@ import os
 import datetime 
 from streamlit import session_state as ss
 import plotly.graph_objects as go
-from P2G_case1 import network_execute, upload_results
+from P2G_case1 import network_execute, upload_results, calls
 import json
 import asyncio
 
@@ -16,31 +16,17 @@ from streamlit_authenticator.utilities.hasher import Hasher
 import yaml
 from yaml.loader import SafeLoader
 from streamlit_keycloak import login
+from dataclasses import asdict
 
-# with open('./config.yaml') as file:
-#     config = yaml.load(file, Loader=SafeLoader)
-
-# # hashed_passwords = Hasher(['password']).generate()
-# # print(hashed_passwords)
 
 st.set_page_config(layout='wide', initial_sidebar_state='expanded')
 st.title('Twin P2G')
-    
-# authenticator = stauth.Authenticate(
-#     config['credentials'],
-#     config['cookie']['name'],
-#     config['cookie']['key'],
-#     config['cookie']['expiry_days'],
-#     # config['pre-authorized']
-# )
-
-# name, authentication_status, username = authenticator.login(location='main')
 
 keycloak = login(
     url="https://idp.haslab-dataspace.pt/",
     realm="enershare",
     client_id="ntua-client",
-    auto_refresh=False,
+    auto_refresh=True,
     custom_labels={
         "labelButton": "Sign in",
         "labelLogin": "Please sign in to your account.",
@@ -53,11 +39,14 @@ keycloak = login(
     }
 )
 
-# if authentication_status:
-    # authenticator.logout(location='main')
 
 if keycloak.authenticated:
-    st.subheader(f"Welcome {keycloak.user_info['preferred_username']}!")
+    # st.subheader(f"Welcome {keycloak.user_info['preferred_username']}!")
+    # st.write(f"Here is your user information:")
+    # st.write(asdict(keycloak))
+    # st.write("Access Token:", keycloak.access_token)
+    # st.write("ID Token:", keycloak.id_token)
+    # st.write("Refresh Token:", keycloak.refresh_token)
     network = pypsa.Network()
 
 
@@ -94,13 +83,13 @@ if keycloak.authenticated:
     def selected_dates(start,end):
         start = pd.to_datetime(start)
         end = pd.to_datetime(end)
-        start=start.strftime('%Y-%m-%d %H:%M:%S+00:00')
-        end=end.strftime('%Y-%m-%d %H:%M:%S+00:00')    
+        start=start.strftime('%Y-%m-%d %H:%M:%S')
+        end=end.strftime('%Y-%m-%d %H:%M:%S')    
         return(start,end)
 
     def validate_date_format(date_str):
         try:
-            datetime.datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S+00:00')
+            datetime.datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
         except ValueError:
             raise ValueError('Incorrect date format. Please use YYYY-MM-DD.')
 
@@ -267,11 +256,11 @@ if keycloak.authenticated:
                     if res_source_type=='csv file':
                         j+=1
                         st.info("""
-                                Upload a file in format: Datetime, GR_solar_generation. \n\r Datetime format: %Y-%m-%d %H:%M:%S+00:00 (e.g. 2018-01-01 09:00:00+00:00)\n\r GR_solar_generation must be in MW. 
+                                Upload a file in format: Datetime, Value. \n\r Datetime format: %Y-%m-%d %H:%M:%S (e.g. 2018-01-01 09:00:00)\n\r Value must be in MW. 
                                 """, icon="ℹ️")                    
                         st.markdown(
                         """
-                        |Datetime |GR_solar_generation |
+                        |Datetime |Value |
                         |- | -| 
                         |2018-01-01 10:00:00 | 2.566 |
                         |2018-01-01 11:00:00 | 3.8 |
@@ -283,9 +272,9 @@ if keycloak.authenticated:
                         if uploaded is not None:
                             df=read_uploaded_csv(uploaded)
                             # df = pd.read_csv(uploaded, delimiter=',', parse_dates=True)
-                            expected_columns = ['Datetime', 'GR_solar_generation']
+                            expected_columns = ['Datetime', 'Value']
                             if not set(expected_columns).issubset(df.columns):
-                                st.error('Upload a file in format: Datetime, GR_solar_generation')
+                                st.error('Upload a file in format: Datetime, Value')
                             else:
                                 df.set_index(['Datetime'], inplace=True)
                                 for date in df.index:
@@ -301,6 +290,13 @@ if keycloak.authenticated:
                         col1,col2=st.columns(2)
                         start_date=col1.date_input('Select start date')
                         end_date=col2.date_input('Select end date')
+                        if st.button('Show Data Space dataset', key='solar'):
+                            endpoint= 'actual_generation_per_type'
+                            params={
+                                'select' :f"*&and=(timestamp.gte.{start_date},timestamp.lte.{end_date})" 
+                            }
+                            dataspace_dataset = calls(endpoint,params)
+                            st.dataframe(dataspace_dataset['solar'])
                         res_source_uri=f"*&and=(timestamp.gte.{start_date},timestamp.lte.{end_date})"
 
                 if generator_carrier=='Wind':
@@ -308,11 +304,11 @@ if keycloak.authenticated:
                     if res_source_type=='csv file':
                         l+=1
                         st.info("""
-                                Upload a file in format: Datetime, GR_wind_onshore_generation_actual. \n\r Datetime format: %Y-%m-%d %H:%M:%S+00:00 (e.g. 2018-01-01 09:00:00+00:00)\n\r GR_wind_onshore_generation_actual must be in MW. 
+                                Upload a file in format: Datetime, Value. \n\r Datetime format: %Y-%m-%d %H:%M:%S (e.g. 2018-01-01 09:00:00)\n\r Value must be in MW. 
                                 """, icon="ℹ️")
                         st.markdown(
                         """
-                        |Datetime |GR_wind_onshore_generation_actual |
+                        |Datetime |Value |
                         |- | -| 
                         |2018-01-01 10:00:00 | 2.566 |
                         |2018-01-01 11:00:00 | 3.8 |
@@ -323,9 +319,9 @@ if keycloak.authenticated:
                         uploaded = st.file_uploader('Choose a file for wind production', type='csv', key=f'res_wind_data{i}')
                         if uploaded is not None:
                             df=read_uploaded_csv(uploaded)
-                            expected_columns = ['Datetime', 'GR_wind_onshore_generation_actual']
+                            expected_columns = ['Datetime', 'Value']
                             if not set(expected_columns).issubset(df.columns):
-                                st.error('Upload a file in format: Datetime, GR_wind_onshore_generation_actual')
+                                st.error('Upload a file in format: Datetime, Value')
                             else:
                                 df.set_index(['Datetime'], inplace=True)
                                 for date in df.index:
@@ -339,6 +335,13 @@ if keycloak.authenticated:
                         col1,col2=st.columns(2)
                         start_date=col1.date_input('Select start date')
                         end_date=col2.date_input('Select end date')
+                        if st.button('Show Data Space dataset', key='wind'):
+                            endpoint= 'actual_generation_per_type'
+                            params={
+                                'select' :f"*&and=(timestamp.gte.{start_date},timestamp.lte.{end_date})" 
+                            }
+                            dataspace_dataset = calls(endpoint,params)
+                            st.dataframe(dataspace_dataset['wind_onshore'])
                         res_source_uri=f"*&and=(timestamp.gte.{start_date},timestamp.lte.{end_date})"
 
                 if generator_carrier not in (('Solar','Wind')):
@@ -398,11 +401,11 @@ if keycloak.authenticated:
                 load_source_type=st.radio('Select your load data', ['csv file','TimescaleDB'],key=f'load_source_type_data{i}', captions=['*Upload your load data*'])            
                 if load_source_type=='csv file':
                     st.info("""
-                            Upload a file in format: Datetime, GR_load. \n\r Datetime format: %Y-%m-%d %H:%M:%S+00:00 (e.g. 2018-01-01 09:00:00+00:00)\n\r GR_load must be in MW. 
+                            Upload a file in format: Datetime, Value. \n\r Datetime format: %Y-%m-%d %H:%M:%S (e.g. 2018-01-01 09:00:00)\n\r Value must be in MW. 
                             """, icon="ℹ️")
                     st.markdown(
                         """
-                        | Datetime            | GR_load |
+                        | Datetime            | Value |
                         |---------------------|---------------------|
                         | 2018-01-01 10:00:00 | 0                   |
                         | 2018-01-01 11:00:00 | 1.175               |
@@ -413,9 +416,9 @@ if keycloak.authenticated:
                     uploaded = st.file_uploader('Choose a file for load', type='csv', key=f'load_data{i}')
                     if uploaded is not None:
                         df=read_uploaded_csv(uploaded)
-                        expected_columns = ['Datetime', 'GR_load']
+                        expected_columns = ['Datetime', 'Value']
                         if not set(expected_columns).issubset(df.columns):
-                            st.error('Upload a file in format: Datetime, GR_load')
+                            st.error('Upload a file in format: Datetime, Value')
                         else:
                             df.set_index(['Datetime'], inplace=True)
                             for date in df.index:
@@ -436,9 +439,25 @@ if keycloak.authenticated:
                         allowed_values=data['properties']['point_id']['allowed_values']
                         exit_point=st.selectbox('Exit Point', allowed_values)
                         st.write(f'Exit point: {exit_point}')
+                        if st.button('Show Data Space dataset', key = 'desfa_flows'):
+                            endpoint= 'desfa_flows_hourly_archive'
+                            params={
+                                'select' :f"*&and=(timestamp.gte.{start_date},timestamp.lte.{end_date},point_id.eq.{exit_point})" 
+                            }
+                            dataspace_dataset = calls(endpoint,params)
+                            st.dataframe(dataspace_dataset)
                         load_source_uri=f"*&and=(timestamp.gte.{start_date},timestamp.lte.{end_date},point_id.eq.{exit_point})"
-                    else:
+                    elif load_carriers=='AC':
+                        if st.button('Show Data Space dataset', key='ipto_total_load'):
+                            endpoint= 'total_load_actual'
+                            params={
+                                'select' :f"*&and=(timestamp.gte.{start_date},timestamp.lte.{end_date})" 
+                            }
+                            dataspace_dataset = calls(endpoint,params)
+                            st.dataframe(dataspace_dataset)
                         load_source_uri=f"*&and=(timestamp.gte.{start_date},timestamp.lte.{end_date})"
+                    else:
+                        load_source_uri=None
 
 
                 load_data={

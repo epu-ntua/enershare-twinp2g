@@ -17,6 +17,8 @@ import json
 import asyncio
 from database_upload_csv import upload_csv
 from dotenv import load_dotenv
+import re
+
 #   
 def fillna(file):
     file=file.fillna(method='pad')
@@ -24,12 +26,12 @@ def fillna(file):
     return file
 
 def dates(file):
-    start='2018-07-01 01:00:00+00:00'
-    end='2018-07-25 23:00:00+00:00'
+    start='2018-07-01 01:00:00'
+    end='2018-07-25 23:00:00'
     start = pd.to_datetime(start)
     end = pd.to_datetime(end)
-    start=start.strftime("%Y-%m-%d %H:%M:%S+00:00")
-    end=end.strftime("%Y-%m-%d %H:%M:%S+00:00")
+    start=start.strftime("%Y-%m-%d %H:%M:%S")
+    end=end.strftime("%Y-%m-%d %H:%M:%S")
     file=file[start:end]
     return file
 
@@ -50,7 +52,7 @@ def components_count(carrier, inputs2):
 
 # 
 def days_between_dates(dt1, dt2):
-    date_format = "%Y-%m-%d %H:%M:%S+00:00"
+    date_format = "%Y-%m-%d %H:%M:%S"
     a = time.mktime(time.strptime(dt1, date_format))
     b = time.mktime(time.strptime(dt2, date_format))
     delta = abs(b - a)
@@ -82,12 +84,16 @@ def calls(endpoint,params):
     # Check if request was successful (status code 200)
     if response.status_code == 200:
         try:
-            data = response.json() 
+            raw_data = response.text
+            cleaned_data = re.sub(r'[\x00-\x1F\x7F]', '', raw_data)
+            data = json.loads(cleaned_data)
+            
+            # data = response.json() 
             df = pd.DataFrame(data)
             df.set_index('timestamp', inplace=True)
             df=df.sort_index() 
             df.index = pd.to_datetime(df.index)
-            df.index = df.index.strftime('%Y-%m-%d %H:%M:%S+00:00')
+            df.index = df.index.strftime('%Y-%m-%d %H:%M:%S')
             df = df.rename_axis('snapshot')
         except ValueError:  
             print("Response content is not valid JSON")
@@ -145,7 +151,7 @@ def network_execute():
             load_data_uri=inputs2['input_series_source_uri']['Load'][i]
             data_load=read_csv(f'data/{load_data_uri}', network)
             network.set_snapshots(data_load.index)
-            p_set=np.array(data_load['GR_load'])
+            p_set=np.array(data_load['Value'])
         else:
             if carrier=='AC':
                 endpoint = 'total_load_actual'
@@ -156,7 +162,10 @@ def network_execute():
                 }
             data_load=calls(endpoint,params)
             network.set_snapshots(data_load.index)
-            p_set=np.array(data_load['actual_load'])
+            if carrier=='AC':
+                p_set=np.array(data_load['actual_load'])
+            elif carrier=='Natural Gas':
+                p_set=np.array(data_load['value'])
 
         network.add("Load", f"Load {bus}", bus=bus, carrier=carrier, p_set=p_set)    
     network.loads
@@ -173,10 +182,10 @@ def network_execute():
             if generator_data_source_type =='csv file':
                 pv_data=inputs2['input_series_source_uri']['Generator'][i]
                 data_pvprod=read_csv(f'data/{pv_data}', network)
-                p_max_pu_value = np.array(data_pvprod['GR_solar_generation'])
+                p_max_pu_value = np.array(data_pvprod['Value'])
             elif generator_data_source_type=='pvlib':
                 data_pvprod=pvlib_simulation(data_load)
-                p_max_pu_value = np.array(data_pvprod['GR_solar_generation'])
+                p_max_pu_value = np.array(data_pvprod['Value'])
             else: 
                 endpoint = 'actual_generation_per_type'  
                 params={
@@ -190,7 +199,7 @@ def network_execute():
             if generator_data_source_type =='csv file':
                 wind_data_source_uri=inputs2['input_series_source_uri']['Generator'][i]
                 data_windprod=read_csv(f'data/{wind_data_source_uri}', network)
-                p_max_pu_value = np.array(data_windprod['GR_wind_onshore_generation_actual'])
+                p_max_pu_value = np.array(data_windprod['Value'])
             else: 
                 endpoint = 'actual_generation_per_type'  
                 params={
@@ -270,14 +279,17 @@ def network_execute():
     # ## Ροη φορτιου και βελτιστοποιηση
 
     #  
-    network.optimize(network.snapshots, solver_name="glpk", solver_options={})
-
+    # network.optimize(network.snapshots, solver_name="glpk", solver_options={})
+    try:
+        network.optimize(network.snapshots, solver_name="glpk", solver_options={})
+    except AttributeError as e:
+        print(f"Optimization failed: {e}")
     #   [markdown]
     # ## Results
 
     #  
     #total system cost for the snapshots optimised
-    network.objective 
+    # network.objective 
 
     #  
     network.statistics().round(2)
