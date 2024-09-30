@@ -17,15 +17,20 @@ import yaml
 from yaml.loader import SafeLoader
 from streamlit_keycloak import login
 from dataclasses import asdict
+from dotenv import load_dotenv
 
+load_dotenv()
+keycloak_url=os.environ.get('KEYCLOAK_URL')
+keycloak_realm=os.environ.get('KEYCLOAK_REALM')
+keycloak_client_id=os.environ.get('KEYCLOAK_CLIENT_ID')
 
 st.set_page_config(layout='wide', initial_sidebar_state='expanded')
 st.title('Twin P2G')
 
 keycloak = login(
-    url="https://idp.haslab-dataspace.pt/",
-    realm="enershare",
-    client_id="ntua-client",
+    url=keycloak_url,
+    realm=keycloak_realm,
+    client_id=keycloak_client_id,
     auto_refresh=True,
     custom_labels={
         "labelButton": "Sign in",
