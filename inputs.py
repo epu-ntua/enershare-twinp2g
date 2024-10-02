@@ -24,6 +24,8 @@ keycloak_url=os.environ.get('KEYCLOAK_URL')
 keycloak_realm=os.environ.get('KEYCLOAK_REALM')
 keycloak_client_id=os.environ.get('KEYCLOAK_CLIENT_ID')
 
+visualization_engine_url=os.environ.get('VISUALIZATION_ENGINE_URL')
+
 st.set_page_config(layout='wide', initial_sidebar_state='expanded')
 st.title('Twin P2G')
 
@@ -34,7 +36,7 @@ keycloak = login(
     auto_refresh=True,
     custom_labels={
         "labelButton": "Sign in",
-        "labelLogin": "Please sign in to your account.",
+        "labelLogin": "Modelling expert login.",
         "errorNoPopup": "Unable to open the authentication popup. Allow popups and refresh the page to proceed.",
         "errorPopupClosed": "Authentication popup was closed manually.",
         "errorFatal": "Unable to connect to Keycloak using the current configuration."   
@@ -44,14 +46,11 @@ keycloak = login(
     }
 )
 
+if not keycloak.authenticated:
+    # If the user is not authenticated, show the link button
+    st.link_button(label="To visualize the results of TwinP2G simulations please navigate to **Enershare Visualization Engine**", url=visualization_engine_url)
 
 if keycloak.authenticated:
-    # st.subheader(f"Welcome {keycloak.user_info['preferred_username']}!")
-    # st.write(f"Here is your user information:")
-    # st.write(asdict(keycloak))
-    # st.write("Access Token:", keycloak.access_token)
-    # st.write("ID Token:", keycloak.id_token)
-    # st.write("Refresh Token:", keycloak.refresh_token)
     network = pypsa.Network()
 
 
@@ -163,6 +162,7 @@ if keycloak.authenticated:
         if button3==False:
             ss.b4_count =0
         else:
+            st.link_button(label="Navigate to **Enershare Visualization Engine** for further analysis", url=visualization_engine_url)
             for csv_file in csv_files:
                 st.write(f'Processing {csv_file}...')
                 df=read_output_csv(csv_file)
@@ -179,7 +179,7 @@ if keycloak.authenticated:
                     tab2.subheader('Components Data')
                     tab2.write(df)
                     csv = convert_df(df)
-                    tab2.download_button(label='Download data', data=csv, file_name='df.csv', mime='text/csv')
+                    # tab2.download_button(label='Download data', data=csv, file_name='df.csv', mime='text/csv')
                     st.divider()                            
             col1, col2 = st.columns(2)
             start = col1.date_input('Start')
@@ -578,6 +578,7 @@ if keycloak.authenticated:
                     use_case_name, timestamp, output_path, input_path, fig, network.buses, network.lines, network.links = network_execute()
                     asyncio.run(upload_results(use_case_name, timestamp, output_path, input_path))
                     
+                    st.link_button("Your results are ready, navigate to the **EnerShare Visualization Engine** to analyze them", visualization_engine_url)
                     st.plotly_chart(fig)
 
                     st.dataframe(network.buses, use_container_width=True)
@@ -610,7 +611,7 @@ if keycloak.authenticated:
                     tab2.subheader('Components Data')
                     tab2.write(df)
                     csv = convert_df(df)
-                    tab2.download_button(label='Download data as CSV', data=csv, file_name='df.csv', mime='text/csv')
+                    # tab2.download_button(label='Download data as CSV', data=csv, file_name='df.csv', mime='text/csv')
                                                     
                     st.write(time.strftime('%d/%m/%Y, %H:%M:%S', time.localtime()))
                     end=time.time()
