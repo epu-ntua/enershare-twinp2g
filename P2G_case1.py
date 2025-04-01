@@ -15,7 +15,7 @@ from pvlib_folder.pvlibdata import pvlib_simulation
 import requests
 import json
 import asyncio
-from database_upload_csv import upload_csv
+from database_upload_csv import upload_csv, get_table
 from dotenv import load_dotenv
 import re
 
@@ -105,12 +105,16 @@ def calls(endpoint,params):
 #   [markdown]
 # ## Network Simulation
 #  
-def network_execute():
+def network_execute(inputs_source):
     #%matplotlib inline
 
     logging.basicConfig(level="INFO")
     network = pypsa.Network()
-    inputs2=pd.read_csv('data/data_inputs2.csv')
+    if inputs_source=='inputs_deeptsf':
+        inputs2=get_table('crete_fc_uc.inputs')
+    elif inputs_source=='inputs_TwinP2G':
+        inputs2=pd.read_csv('data/data_inputs2.csv')
+    # inputs2=pd.read_csv('data/data_inputs2.csv')
     inputs2.set_index(['Component','carrier'],inplace=True)
     inputs2
 
@@ -125,40 +129,40 @@ def network_execute():
     # 
     for i in range(buses):
         carrier=inputs2.loc['Bus'].index[i]
-        bus=inputs2['bus']['Bus'][i]
-        longitude=inputs2['longitude']['Bus'][i]
-        latitude=inputs2['latitude']['Bus'][i]
+        bus=inputs2['bus']['Bus'].iloc[i]
+        longitude=inputs2['longitude']['Bus'].iloc[i]
+        latitude=inputs2['latitude']['Bus'].iloc[i]
         network.add("Bus",name=bus, carrier=carrier, x=longitude, y=latitude)
     network.buses
     #
     # ## Lines
     #
     for i in range(lines):
-        bus0 = inputs2['from_bus']['Line'][i]
-        bus1 = inputs2['to_bus']['Line'][i]
-        r=inputs2['series_reactance']['Line'][i]
-        x=inputs2['series_resistance']['Line'][i]
+        bus0 = inputs2['from_bus']['Line'].iloc[i]
+        bus1 = inputs2['to_bus']['Line'].iloc[i]
+        r=inputs2['series_reactance']['Line'].iloc[i]
+        x=inputs2['series_resistance']['Line'].iloc[i]
         network.add("Line", f"Line {bus0} - {bus1}", bus0=bus0, bus1=bus1, r=r, x=x, s_nom_extendable=True)
     network.lines
     # 
     # ## Loads
     #
     for i in range(loads):
-        bus = inputs2['bus']['Load'][i]
+        bus = inputs2['bus']['Load'].iloc[i]
         carrier=inputs2.loc['Load'].index[i]
-        load_data_source_type=inputs2['input_series_source_type']['Load'][i]
+        load_data_source_type=inputs2['input_series_source_type']['Load'].iloc[i]
         if load_data_source_type=='csv file':
-            load_data_uri=inputs2['input_series_source_uri']['Load'][i]
+            load_data_uri=inputs2['input_series_source_uri']['Load'].iloc[i]
             data_load=read_csv(f'data/{load_data_uri}', network)
             network.set_snapshots(data_load.index)
             p_set=np.array(data_load['Value'])
-        else:
+        elif load_data_source_type=='TimescaleDB':
             if carrier=='AC':
                 endpoint = 'total_load_actual'
             elif carrier == 'Natural Gas':
                 endpoint= 'desfa_flows_hourly_archive'
             params={
-                'select': inputs2['input_series_source_uri']['Load'][i]
+                'select': inputs2['input_series_source_uri']['Load'].iloc[i]
                 }
             data_load=calls(endpoint,params)
             network.set_snapshots(data_load.index)
@@ -166,6 +170,15 @@ def network_execute():
                 p_set=np.array(data_load['actual_load'])
             elif carrier=='Natural Gas':
                 p_set=np.array(data_load['value'])
+        elif load_data_source_type=='deepTSF':
+            load_data_uri=inputs2['input_series_source_uri']['Load'].iloc[i]
+            data_load=get_table(load_data_uri)
+            data_load.set_index(['Datetime'], inplace=True)
+            data_load.index = pd.to_datetime(data_load.index)
+            data_load.index = data_load.index.strftime('%Y-%m-%d %H:%M:%S')
+            data_load = data_load.rename_axis('snapshot')
+            network.set_snapshots(data_load.index)
+            p_set=np.array(data_load['Value'])
 
         network.add("Load", f"Load {bus}", bus=bus, carrier=carrier, p_set=p_set)    
     network.loads
@@ -174,55 +187,66 @@ def network_execute():
     # ## Generators
     #
     for i in range(generators): 
-        bus=inputs2['bus']['Generator'][i]
-        generator_data_source_type=inputs2['input_series_source_type']['Generator'][i]
+        bus=inputs2['bus']['Generator'].iloc[i]
+        generator_data_source_type=inputs2['input_series_source_type']['Generator'].iloc[i]
         carrier=inputs2.loc['Generator'].index[i]
         if carrier=='Solar':
             # p_min_pu=0    
             if generator_data_source_type =='csv file':
-                pv_data=inputs2['input_series_source_uri']['Generator'][i]
+                pv_data=inputs2['input_series_source_uri']['Generator'].iloc[i]
                 data_pvprod=read_csv(f'data/{pv_data}', network)
                 p_max_pu_value = np.array(data_pvprod['Value'])
             elif generator_data_source_type=='pvlib':
                 data_pvprod=pvlib_simulation(data_load)
                 p_max_pu_value = np.array(data_pvprod['Value'])
+            elif generator_data_source_type=='deepTSF':
+                pv_data=inputs2['input_series_source_uri']['Generator'].iloc[i]
+                data_pvprod=get_table(pv_data)
+                data_pvprod.set_index(['Datetime'], inplace=True)
+                p_max_pu_value = np.array(data_pvprod['Value'])
             else: 
                 endpoint = 'actual_generation_per_type'  
                 params={
-                    'select': inputs2['input_series_source_uri']['Generator'][i]
+                    'select': inputs2['input_series_source_uri']['Generator'].iloc[i]
                     }
                 data_pvprod=calls(endpoint,params)
                 p_max_pu_value=np.array(data_pvprod['solar'])
+            p_max_pu_value[p_max_pu_value < 0] = 0
 
         elif carrier=='Wind':
             # p_min_pu=0
             if generator_data_source_type =='csv file':
-                wind_data_source_uri=inputs2['input_series_source_uri']['Generator'][i]
+                wind_data_source_uri=inputs2['input_series_source_uri']['Generator'].iloc[i]
                 data_windprod=read_csv(f'data/{wind_data_source_uri}', network)
+                p_max_pu_value = np.array(data_windprod['Value'])
+            elif generator_data_source_type=='deepTSF':
+                wind_data_source_uri=inputs2['input_series_source_uri']['Generator'].iloc[i]
+                data_windprod=get_table(wind_data_source_uri)
+                data_windprod.set_index(['Datetime'], inplace=True)
                 p_max_pu_value = np.array(data_windprod['Value'])
             else: 
                 endpoint = 'actual_generation_per_type'  
                 params={
-                    'select': inputs2['input_series_source_uri']['Generator'][i]
+                    'select': inputs2['input_series_source_uri']['Generator'].iloc[i]
                     }
                 data_windprod=calls(endpoint,params)
                 p_max_pu_value=np.array(data_windprod['wind_onshore'])
-        
+            p_max_pu_value[p_max_pu_value < 0] = 0        
         else:
             # p_min_pu=0.3
             p_max_pu_value = 1  
         network.add("Carrier", name=carrier)
         network.add(
             "Generator",
-            f'Generator {bus}',
+            f'Generator {bus} {carrier}',
             bus=bus,
             carrier=carrier,  
-            p_nom=float(inputs2['p_nom']['Generator'][i]),  
+            p_nom=float(inputs2['p_nom']['Generator'].iloc[i]),  
             # p_min_pu=p_min_pu,
             p_nom_extendable=False,
             p_max_pu=p_max_pu_value,
-            capital_cost=float(inputs2['capital_cost']['Generator'][i]),  
-            marginal_cost=float(inputs2['marginal_cost']['Generator'][i]) 
+            capital_cost=float(inputs2['capital_cost']['Generator'].iloc[i]),  
+            marginal_cost=float(inputs2['marginal_cost']['Generator'].iloc[i]) 
         )
     network.generators
 
@@ -236,10 +260,10 @@ def network_execute():
     # ## Links
     # 
     for i in range(links):
-        bus0=inputs2['from_bus']['Link'][i]
-        bus1=inputs2['to_bus']['Link'][i]
+        bus0=inputs2['from_bus']['Link'].iloc[i]
+        bus1=inputs2['to_bus']['Link'].iloc[i]
         carrier = inputs2.loc['Link'].index[i]
-        efficiency=inputs2['efficiency']['Link'][i]
+        efficiency=inputs2['efficiency']['Link'].iloc[i]
 
         network.add("Carrier", name=carrier)
         network.add(
@@ -249,17 +273,17 @@ def network_execute():
             bus1=bus1,
             carrier=carrier,
             efficiency=efficiency,
-            p_nom=float(inputs2['p_nom']['Link'][i]),  
+            p_nom=float(inputs2['p_nom']['Link'].iloc[i]),  
             p_nom_extendable=True,
-            capital_cost=float(inputs2['capital_cost']['Link'][i]) // (20 / investment_period), 
-            marginal_cost=float(inputs2['marginal_cost']['Link'][i]),  
+            capital_cost=float(inputs2['capital_cost']['Link'].iloc[i]) // (20 / investment_period), 
+            marginal_cost=float(inputs2['marginal_cost']['Link'].iloc[i]),  
         )
     network.links
     #   [markdown]
     # ## Stores
     # 
     for i in range(stores):
-        bus=inputs2['bus']['Store'][i]
+        bus=inputs2['bus']['Store'].iloc[i]
         carrier = inputs2.loc['Store'].index[i]
         network.add("Carrier", name=carrier)
         network.add(
@@ -267,11 +291,11 @@ def network_execute():
             name=f'Store {bus}',
             bus=bus,
             carrier=carrier,
-            e_nom=float(inputs2['p_nom']['Store'][i]),  
+            e_nom=float(inputs2['p_nom']['Store'].iloc[i]),  
             e_cyclic=True,
             e_nom_extendable=True,
-            capital_cost=float(inputs2['capital_cost']['Store'][i]) // (25 / investment_period),  
-            marginal_cost=float(inputs2['marginal_cost']['Store'][i]) 
+            capital_cost=float(inputs2['capital_cost']['Store'].iloc[i]) // (25 / investment_period),  
+            marginal_cost=float(inputs2['marginal_cost']['Store'].iloc[i]) 
         )
     network.stores
 
@@ -329,8 +353,8 @@ def network_execute():
     df
 
     #   creates a folder to save the files
-    use_case_name=inputs2['use_case_name']['Bus'][0]
-    timestamp=inputs2['timestamp']['Bus'][0]
+    use_case_name=inputs2['use_case_name']['Bus'].iloc[0]
+    timestamp=inputs2['timestamp']['Bus'].iloc[0]
     output_path = f"./results/{use_case_name}/{timestamp}/outputs"
     input_path = f"./results/{use_case_name}/{timestamp}/inputs"
 
@@ -340,11 +364,13 @@ def network_execute():
     df.to_csv(f"{output_path}/output_series.csv", index=True)
     statistics.to_csv(f"{output_path}/statistics.csv")
     inputs2.to_csv(f"{input_path}/inputs.csv")
+    if inputs_source=='inputs_deeptsf':
+        return use_case_name, timestamp, output_path, input_path
+    elif inputs_source=='inputs_TwinP2G':
+        return use_case_name, timestamp, output_path, input_path, fig, network.buses, network.lines, network.links
 
-    return use_case_name, timestamp, output_path, input_path, fig, network.buses, network.lines, network.links
-
-async def upload_results(use_case_name, timestamp, output_path, input_path):
-    schema_name = 'twinp2g_results'
+async def upload_results(use_case_name, timestamp, output_path, input_path, schema_name):
+    # schema_name = 'twinp2g_results'
 
     table_files = {
         'output_series': os.path.join(output_path, "output_series.csv"),
@@ -354,7 +380,10 @@ async def upload_results(use_case_name, timestamp, output_path, input_path):
     results = []
 
     for table_name, csv_file in table_files.items():
-        new_table_name = f"{use_case_name}_{timestamp}_{table_name}"
+        if schema_name=='crete_fc_uc':
+            new_table_name = f"{use_case_name}_{table_name}"
+        else:
+            new_table_name = f"{use_case_name}_{timestamp}_{table_name}"
         result = await upload_csv(csv_file=csv_file, table_name=new_table_name, schema_name=schema_name)
         results.append(result)
     
