@@ -11,7 +11,7 @@ import math
 
 # %%
 def days_between_dates(dt1, dt2):
-    date_format = "%Y-%m-%d %H:%M:%S+00:00"
+    date_format = "%Y-%m-%d %H:%M:%S"
     a = time.mktime(time.strptime(dt1, date_format))
     b = time.mktime(time.strptime(dt2, date_format))
     delta = abs(b - a)
@@ -85,9 +85,9 @@ def pvlib_simulation(data_load):
 
     modelchain.run_model(data)
     solar_data=modelchain.results.ac
-    solar_data=pd.DataFrame(solar_data, columns=(['GR_solar_generation']))
+    solar_data=pd.DataFrame(solar_data, columns=(['Value']))
 
-    solar_data.loc[solar_data['GR_solar_generation'] < 0, 'GR_solar_generation'] = 0
+    solar_data.loc[solar_data['Value'] < 0, 'Value'] = 0
 
     # Convert Watt to MW
     solar_data/=1000000
