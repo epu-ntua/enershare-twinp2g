@@ -1,0 +1,24 @@
+FROM continuumio/miniconda3
+
+ENV PATH="/root/miniconda3/bin:${PATH}"
+
+WORKDIR /twinp2g_api
+
+COPY requirements.txt ./requirements.txt
+COPY P2G_case1.py ./P2G_case1.py
+RUN apt-get update && apt-get install -y glpk-utils
+
+RUN conda create -n twinp2g_api-env python=3.11.3 -y && \
+    echo "conda activate twinp2g_api-env" >> ~/.bashrc && \
+    conda init bash
+
+RUN /bin/bash -c "source activate twinp2g_api-env && \
+    pip3 install --no-cache-dir -r requirements.txt"
+
+COPY . .
+
+EXPOSE 9009
+
+SHELL ["conda", "run", "-n", "twinp2g_api-env", "/bin/bash", "-c"]
+
+ENTRYPOINT ["conda", "run", "--no-capture-output", "-n", "twinp2g_api-env", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "9009", "--reload"]

@@ -576,7 +576,7 @@ if keycloak.authenticated:
 
                     # network_execute()
                     use_case_name, timestamp, output_path, input_path, fig, network.buses, network.lines, network.links = network_execute()
-                    asyncio.run(upload_results(use_case_name, timestamp, output_path, input_path))
+                    asyncio.run(upload_results(use_case_name, timestamp, output_path, input_path, schema_name='twinp2g_results'))
                     
                     st.link_button("Your results are ready, navigate to the **EnerShare Visualization Engine** to analyze them", visualization_engine_url)
                     st.plotly_chart(fig)
