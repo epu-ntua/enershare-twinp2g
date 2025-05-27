@@ -157,19 +157,49 @@ def network_execute(inputs_source):
             network.set_snapshots(data_load.index)
             p_set=np.array(data_load['Value'])
         elif load_data_source_type=='TimescaleDB':
+            load_data_uri_data=inputs2['input_series_source_uri']['Load'].iloc[i]
             if carrier=='AC':
                 endpoint = 'total_load_actual'
+                params={
+                    'select': inputs2['input_series_source_uri']['Load'].iloc[i]
+                    }  
+                #Added to filter the data from the dataspace (DS params not working)
+                match = re.search(r'timestamp\.gte\.([0-9\-]+),timestamp\.lte\.([0-9\-]+)', load_data_uri_data)
+                if match:
+                    start_date = match.group(1)
+                    end_date = match.group(2)
+                    # print("Start:", start_date)
+                    # print("End:", end_date)
+                else:
+                    print("No dates found")    
+                data_load=calls(endpoint,params)
+                data_load = data_load[start_date:end_date]                          
+                network.set_snapshots(data_load.index)            
+                p_set=np.array(data_load['actual_load'])
             elif carrier == 'Natural Gas':
                 endpoint= 'desfa_flows_hourly_archive'
-            params={
-                'select': inputs2['input_series_source_uri']['Load'].iloc[i]
-                }
-            data_load=calls(endpoint,params)
-            network.set_snapshots(data_load.index)
-            if carrier=='AC':
-                p_set=np.array(data_load['actual_load'])
-            elif carrier=='Natural Gas':
+                params={
+                    'select': inputs2['input_series_source_uri']['Load'].iloc[i]
+                    }
+                #Added to filter the data from the dataspace (DS params not working)
+                match = re.search(r'timestamp\.gte\.([0-9\-]+),timestamp\.lte\.([0-9\-]+),point_id\.eq\.([A-Z0-9_]+)', load_data_uri_data)
+                if match:
+                    start_date = match.group(1)
+                    end_date = match.group(2)
+                    exit_point = match.group(3) 
+                    # print("Start:", start_date)
+                    # print("End:", end_date)
+                else:
+                    print("No dates found")
+                data_load=calls(endpoint,params)
+                data_load = data_load[start_date:end_date]
+                data_load = data_load[data_load['point_id'] == exit_point]
+                network.set_snapshots(data_load.index)
+            # if carrier=='AC':
+                
+            # elif carrier=='Natural Gas':
                 p_set=np.array(data_load['value'])
+        
         elif load_data_source_type=='deepTSF':
             load_data_uri=inputs2['input_series_source_uri']['Load'].iloc[i]
             data_load=get_table(load_data_uri)
@@ -209,7 +239,18 @@ def network_execute(inputs_source):
                 params={
                     'select': inputs2['input_series_source_uri']['Generator'].iloc[i]
                     }
+                #Added to filter the data from the dataspace (DS params not working)
+                pv_data=inputs2['input_series_source_uri']['Generator'].iloc[i]
+                match = re.search(r'timestamp\.gte\.([0-9\-]+),timestamp\.lte\.([0-9\-]+)', pv_data)
+                if match:
+                    start_date = match.group(1)
+                    end_date = match.group(2)
+                    # print("Start:", start_date)
+                    # print("End:", end_date)
+                else:
+                    print("No dates found")
                 data_pvprod=calls(endpoint,params)
+                data_pvprod = data_pvprod[start_date:end_date]
                 p_max_pu_value=np.array(data_pvprod['solar'])
             p_max_pu_value[p_max_pu_value < 0] = 0
 
@@ -229,7 +270,18 @@ def network_execute(inputs_source):
                 params={
                     'select': inputs2['input_series_source_uri']['Generator'].iloc[i]
                     }
+                #Added to filter the data from the dataspace (DS params not working)
+                wind_data_source_uri=inputs2['input_series_source_uri']['Generator'].iloc[i]
+                match = re.search(r'timestamp\.gte\.([0-9\-]+),timestamp\.lte\.([0-9\-]+)', wind_data_source_uri)
+                if match:
+                    start_date = match.group(1)
+                    end_date = match.group(2)
+                    # print("Start:", start_date)
+                    # print("End:", end_date)
+                else:
+                    print("No dates found")
                 data_windprod=calls(endpoint,params)
+                data_windprod = data_windprod[start_date:end_date]
                 p_max_pu_value=np.array(data_windprod['wind_onshore'])
             p_max_pu_value[p_max_pu_value < 0] = 0        
         else:

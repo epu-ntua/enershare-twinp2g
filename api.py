@@ -12,7 +12,7 @@ import os
 load_dotenv()
 
 port=os.environ.get('API_PORT')
-app = FastAPI()
+app = FastAPI(docs_url="/docs", openapi_url="/openapi.json")
 
 app.add_middleware(
     CORSMiddleware,
@@ -39,7 +39,7 @@ def network_execute_endpoint(request: DataRequest):
 
 @app.get("/")
 async def root():
-    return {"message": f"Congratulations! Your API is working as expected. Now head over to http://localhost:{port}/docs"}
+    return {"message": f"Congratulations! Your API is working as expected. Now head over to /docs"}
 
 if __name__ == "__main__":
     uvicorn.run('api:app', host="0.0.0.0", port=port, reload=True)

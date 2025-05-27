@@ -371,6 +371,12 @@ elif "access_token" in st.session_state:
                                 'select' :f"*&and=(timestamp.gte.{start_date},timestamp.lte.{end_date})" 
                             }
                             dataspace_dataset = calls(endpoint,params)
+                            # Ensure index is datetime
+                            dataspace_dataset.index = pd.to_datetime(dataspace_dataset.index)
+                            # Convert start_date and end_date to datetime
+                            start_dt = pd.to_datetime(start_date)
+                            end_dt = pd.to_datetime(end_date)
+                            dataspace_dataset = dataspace_dataset.loc[start_dt:end_dt]
                             st.dataframe(dataspace_dataset['solar'])
                         res_source_uri=f"*&and=(timestamp.gte.{start_date},timestamp.lte.{end_date})"
 
@@ -416,6 +422,13 @@ elif "access_token" in st.session_state:
                                 'select' :f"*&and=(timestamp.gte.{start_date},timestamp.lte.{end_date})" 
                             }
                             dataspace_dataset = calls(endpoint,params)
+                            # Ensure index is datetime
+                            dataspace_dataset.index = pd.to_datetime(dataspace_dataset.index)
+                            # Convert start_date and end_date to datetime
+                            start_dt = pd.to_datetime(start_date)
+                            end_dt = pd.to_datetime(end_date)
+                            dataspace_dataset = dataspace_dataset.loc[start_dt:end_dt]
+                             
                             st.dataframe(dataspace_dataset['wind_onshore'])
                         res_source_uri=f"*&and=(timestamp.gte.{start_date},timestamp.lte.{end_date})"
 
@@ -529,6 +542,13 @@ elif "access_token" in st.session_state:
                                 'select' :f"*&and=(timestamp.gte.{start_date},timestamp.lte.{end_date})" 
                             }
                             dataspace_dataset = calls(endpoint,params)
+                            # Ensure index is datetime
+                            dataspace_dataset.index = pd.to_datetime(dataspace_dataset.index)
+                            # Convert start_date and end_date to datetime
+                            start_dt = pd.to_datetime(start_date)
+                            end_dt = pd.to_datetime(end_date)
+                            dataspace_dataset = dataspace_dataset.loc[start_dt:end_dt]
+                             
                             st.dataframe(dataspace_dataset)
                         load_source_uri=f"*&and=(timestamp.gte.{start_date},timestamp.lte.{end_date})"
                     else:
@@ -645,7 +665,7 @@ elif "access_token" in st.session_state:
                     inputs.to_csv('data/data_inputs2.csv', index=False)
 
                     # network_execute()
-                    use_case_name, timestamp, output_path, input_path, fig, network.buses, network.lines, network.links = network_execute()
+                    use_case_name, timestamp, output_path, input_path, fig, network.buses, network.lines, network.links = network_execute("inputs_TwinP2G")
                     asyncio.run(upload_results(use_case_name, timestamp, output_path, input_path, schema_name='twinp2g_results'))
                     
                     st.link_button("Your results are ready, navigate to the **EnerShare Visualization Engine** to analyze them", visualization_engine_url)
