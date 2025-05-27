@@ -18,39 +18,109 @@ from yaml.loader import SafeLoader
 from streamlit_keycloak import login
 from dataclasses import asdict
 from dotenv import load_dotenv
+from keycloak import KeycloakOpenID
 
 load_dotenv()
 keycloak_url=os.environ.get('KEYCLOAK_URL')
 keycloak_realm=os.environ.get('KEYCLOAK_REALM')
 keycloak_client_id=os.environ.get('KEYCLOAK_CLIENT_ID')
+redirect_uri = os.environ.get('REDIRECT_URI')
 
 visualization_engine_url=os.environ.get('VISUALIZATION_ENGINE_URL')
+marketplace_url=os.environ.get('MARKETPLACE_URL')
 
-st.set_page_config(layout='wide', initial_sidebar_state='expanded')
-st.title('Twin P2G')
+st.set_page_config(page_title="EnerShare TwinP2G", 
+                   page_icon="logo_Enershare_Icon.png",
+                   layout='wide', 
+                   initial_sidebar_state='expanded', 
+                   )
+st.title('TwinP2G')
 
-keycloak = login(
-    url=keycloak_url,
-    realm=keycloak_realm,
+# --- Initialize KeycloakOpenID object ---
+keycloak_openid = KeycloakOpenID(
+    server_url=keycloak_url,
+    realm_name=keycloak_realm,
     client_id=keycloak_client_id,
-    auto_refresh=True,
-    custom_labels={
-        "labelButton": "Sign in",
-        "labelLogin": "Modelling expert login.",
-        "errorNoPopup": "Unable to open the authentication popup. Allow popups and refresh the page to proceed.",
-        "errorPopupClosed": "Authentication popup was closed manually.",
-        "errorFatal": "Unable to connect to Keycloak using the current configuration."   
-    },
-    init_options={
-        'checkLoginIframe': False
-    }
 )
 
-if not keycloak.authenticated:
-    # If the user is not authenticated, show the link button
-    st.link_button(label="To visualize the results of TwinP2G simulations please navigate to **Enershare Visualization Engine**", url=visualization_engine_url)
+# --- Construct Authentication URL ---
+auth_url = keycloak_openid.auth_url(
+    redirect_uri=redirect_uri,
+    scope="openid email profile"
+)
 
-if keycloak.authenticated:
+# --- Main Application ---
+if "code" in st.experimental_get_query_params() and "access_token" not in st.session_state:
+    # Handle the callback
+    code = st.experimental_get_query_params()["code"][0]
+    try:
+        # Exchange the authorization code for tokens
+        token = keycloak_openid.token(grant_type="authorization_code", code=code, redirect_uri=redirect_uri)
+        st.session_state["access_token"] = token["access_token"]
+        st.session_state["refresh_token"] = token["refresh_token"]
+        st.session_state["id_token"] = token.get("id_token")
+        
+        # Clear the query parameters to prevent code reuse
+        st.experimental_set_query_params()
+        st.success("Successfully logged in!")
+        st.rerun()  # Refresh the app to clear the code from the URL
+    except Exception as e:
+        # Clear the query parameters to avoid reusing the invalid code
+        st.experimental_set_query_params()
+        if "invalid_grant" in str(e):
+            st.error("The authorization code is invalid or has expired. Please try logging in again.")
+        else:
+            st.error(f"Authentication failed: {e}")
+elif "access_token" in st.session_state:
+
+    col1, col2, col3 = st.columns([4, 1, 1])
+    with col2:
+        st.success("✅ Logged in")
+    with col3:
+        if st.button("⎋ Sign out", use_container_width=False):
+            st.experimental_set_query_params()
+            # Call Keycloak logout endpoint
+            try:
+                keycloak_openid.logout(refresh_token=st.session_state["refresh_token"])
+            except Exception as e:
+                st.warning(f"Server-side logout failed: {e}")
+
+            # Clear tokens
+            for key in ["access_token", "refresh_token", "id_token"]:
+                st.session_state.pop(key, None)
+
+            # Optionally set a logout flag to prevent code reuse on fast rerun
+            # st.session_state["logged_out"] = True
+            st.rerun()
+
+# keycloak = login(
+#     url=keycloak_url,
+#     realm=keycloak_realm,
+#     client_id=keycloak_client_id,
+#     # auto_refresh=True,
+#     auto_refresh=False,
+#     custom_labels={
+#         "labelButton": "Sign in",
+#         "labelLogin": "Modelling expert login.",
+#         "errorNoPopup": "Unable to open the authentication popup. Allow popups and refresh the page to proceed.",
+#         "errorPopupClosed": "Authentication popup was closed manually.",
+#         "errorFatal": "Unable to connect to Keycloak using the current configuration."   
+#     },
+#     init_options={
+#         'onLoad': 'login-required',  # Use redirect-based login,
+#         'silentCheckSsoFallback': False,  # Fallback to silent check SSO if login-required fails
+#         # 'silentCheckSsoRedirectUri': False,
+#         'checkLoginIframe': False,
+#         'flow': 'standard'
+
+#     }
+# )
+
+# if not keycloak.authenticated:
+#     # If the user is not authenticated, show the link button
+#     st.link_button(label="To visualize the results of TwinP2G simulations please navigate to **Enershare Visualization Engine**", url=visualization_engine_url)
+
+# if keycloak.authenticated:
     network = pypsa.Network()
 
 
@@ -301,6 +371,12 @@ if keycloak.authenticated:
                                 'select' :f"*&and=(timestamp.gte.{start_date},timestamp.lte.{end_date})" 
                             }
                             dataspace_dataset = calls(endpoint,params)
+                            # Ensure index is datetime
+                            dataspace_dataset.index = pd.to_datetime(dataspace_dataset.index)
+                            # Convert start_date and end_date to datetime
+                            start_dt = pd.to_datetime(start_date)
+                            end_dt = pd.to_datetime(end_date)
+                            dataspace_dataset = dataspace_dataset.loc[start_dt:end_dt]
                             st.dataframe(dataspace_dataset['solar'])
                         res_source_uri=f"*&and=(timestamp.gte.{start_date},timestamp.lte.{end_date})"
 
@@ -346,6 +422,13 @@ if keycloak.authenticated:
                                 'select' :f"*&and=(timestamp.gte.{start_date},timestamp.lte.{end_date})" 
                             }
                             dataspace_dataset = calls(endpoint,params)
+                            # Ensure index is datetime
+                            dataspace_dataset.index = pd.to_datetime(dataspace_dataset.index)
+                            # Convert start_date and end_date to datetime
+                            start_dt = pd.to_datetime(start_date)
+                            end_dt = pd.to_datetime(end_date)
+                            dataspace_dataset = dataspace_dataset.loc[start_dt:end_dt]
+                             
                             st.dataframe(dataspace_dataset['wind_onshore'])
                         res_source_uri=f"*&and=(timestamp.gte.{start_date},timestamp.lte.{end_date})"
 
@@ -459,6 +542,13 @@ if keycloak.authenticated:
                                 'select' :f"*&and=(timestamp.gte.{start_date},timestamp.lte.{end_date})" 
                             }
                             dataspace_dataset = calls(endpoint,params)
+                            # Ensure index is datetime
+                            dataspace_dataset.index = pd.to_datetime(dataspace_dataset.index)
+                            # Convert start_date and end_date to datetime
+                            start_dt = pd.to_datetime(start_date)
+                            end_dt = pd.to_datetime(end_date)
+                            dataspace_dataset = dataspace_dataset.loc[start_dt:end_dt]
+                             
                             st.dataframe(dataspace_dataset)
                         load_source_uri=f"*&and=(timestamp.gte.{start_date},timestamp.lte.{end_date})"
                     else:
@@ -575,7 +665,7 @@ if keycloak.authenticated:
                     inputs.to_csv('data/data_inputs2.csv', index=False)
 
                     # network_execute()
-                    use_case_name, timestamp, output_path, input_path, fig, network.buses, network.lines, network.links = network_execute()
+                    use_case_name, timestamp, output_path, input_path, fig, network.buses, network.lines, network.links = network_execute("inputs_TwinP2G")
                     asyncio.run(upload_results(use_case_name, timestamp, output_path, input_path, schema_name='twinp2g_results'))
                     
                     st.link_button("Your results are ready, navigate to the **EnerShare Visualization Engine** to analyze them", visualization_engine_url)
@@ -634,7 +724,98 @@ if keycloak.authenticated:
                         fig = plotly_chart_results(filtered_df)
                         st.plotly_chart(fig, use_container_width=True)        
                     tab6.write(filtered_df) 
+else:
+    # Custom-styled login button
+    st.markdown(
+        f"""
+        <div style="text-align: center; margin-top: 20px; background-color: #FFF8DC; padding: 20px; border-radius: 10px;  display: flex; align-items: center;">
+            <a href="{auth_url}" style="
+                display: inline-block;
+                padding: 10px 20px;
+                font-size: 16px;
+                font-family: sans-serif;
+                color: white;
+                background-color: #007BFF;
+                text-decoration: none;
+                border-radius: 5px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                margin-right: 10px;
+            ">
+                Sign in
+            </a>
+            <span style="font-size: 16px; color: #8B8000; text-align: left;">Modelling expert login.</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+# Link to the visualization engine
+    st.markdown(
+        f"""
+        <div style="text-align: center; margin-top: 10px; display: flex; align-items: center;">
+            <a href="{visualization_engine_url}" style="
+                font-size: 14px;
+                font-family: sans-serif;
+                color: black;
+                text-decoration: none;
+                border: 1px solid grey;
+                padding: 5px 10px;
+                border-radius: 5px;
+                display: inline-block;
+            ">
+                To visualize the results of TwinP2G simulations please navigate to <b>Enershare Visualization Engine<b>
+            </a>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f"""
+        <div style="text-align: center; margin-top: 10px; display: flex; align-items: center;">
+            <a href="{marketplace_url}" style="
+                font-size: 14px;
+                font-family: sans-serif;
+                color: black;
+                text-decoration: none;
+                border: 1px solid grey;
+                padding: 5px 10px;
+                border-radius: 5px;
+                display: inline-block;
+            ">
+                To access data from Data Space please navigate to <b>Enershare Marketplace<b>
+            </a>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+footer = """
+<style>
+.footer {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    background-color: white;
+    color: black;
+    padding: 10px;
+    box-shadow: 0px -2px 5px rgba(9, 228, 122, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+}
 
+.footer img {
+    height: 45px;  /* Adjust size as needed */
+}
+</style>
+
+<div class="footer">
+    <p>Copyright EnerShare Consortium &copy;2025. All rights reserved.</p>
+    <img src="https://upload.wikimedia.org/wikipedia/commons/b/b7/Flag_of_Europe.svg" alt="EU Flag">
+    <p>Co-funded by the Horizon 2020 Framework Programme of the European Union under Grant Agreement No 101069831</p>
+</div>
+"""
+st.markdown(footer,unsafe_allow_html=True)
 # elif authentication_status == False:
 #     st.error('Username/password is incorrect')
 # elif authentication_status == None:
